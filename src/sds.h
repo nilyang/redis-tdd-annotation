@@ -65,6 +65,8 @@ struct sdshdr {
  * T = O(1)
  */
 static inline size_t sdslen(const sds s) {
+    //1. 通过指针运算，将指针向前移动到 struct sdshdr 的开始地址
+    //2. 通过(void*)将这个指针转换为void指针，然后赋值给结构体，这样便转换成了结构体指针
     struct sdshdr *sh = (void*)(s-(sizeof(struct sdshdr)));
     return sh->len;
 }
