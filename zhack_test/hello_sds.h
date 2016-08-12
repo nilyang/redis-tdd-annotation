@@ -29,6 +29,16 @@ static inline size_t sdsavail(const sds s){
     return sh->free;
 }
 
+/**
+ * 为了方便测试，通过sds指针获取sdshdr结构的数据字段buf
+ * @param const sds s
+ * @return sds
+ */
+sds sdsbuf(const sds s)
+{
+    return (((struct sdshdr *)(s - (sizeof(struct sdshdr))))->buf);
+}
+
 sds sdsnewlen(const void *init, size_t initlen);
 sds sdsnew(const char *init);
 sds sdsempty(void);

@@ -119,8 +119,17 @@ int main()
     // sds y;
     sds x = sdsnew("foo");
     printf("%zu\n",sdslen(x));
-    int ret = memcpy(x,"foo\0",4) == 0;
+    int ret = memcmp(x,"foo\0",4);
+    printf("%s\n",sdsbuf(x));
     test_cond("Create a string and obtain the length",
-        sdslen(x) == 3 && ret);
+        sdslen(x) == 3 && ret == 0);
+
+    sdsfree(x);
+    x = sdsnewlen("foo",2);
+    test_cond("Create a string with specified length",
+        sdslen(x) == 2 && memcmp(x,"fo\0",3) == 0);
+    
+    test_report();
+    return 0;
 }
 #endif
