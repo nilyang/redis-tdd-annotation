@@ -15,7 +15,7 @@
 int __failed_tests_ext = 0;
 int __test_num_ext = 0;
 #define test_cond_ext(descr,_c) do { \
-    __failed_tests_ext++; printf("%d - %s: ", __failed_tests_ext, descr); \
+    __test_num_ext++; printf("%d - %s: ", __test_num_ext, descr); \
     if(_c) printf( MY_COLOR_GREEN "PASSED" MY_COLOR_RESET "\n" ); \
     else {printf(MY_COLOR_RED_FLASH "FAILED" MY_COLOR_RESET "\n"); __failed_tests_ext++;} \
 } while(0);
@@ -23,8 +23,8 @@ int __test_num_ext = 0;
     printf( "\n"MY_COLOR_WHITE "%d tests" MY_COLOR_RESET "," \
                 MY_COLOR_GREEN "%d passed " MY_COLOR_RESET"," \
                 MY_COLOR_RED "%d"MY_COLOR_RESET MY_COLOR_YELLOW " failed" MY_COLOR_RESET "\n\n" , \
-            __failed_tests_ext, \
-            __failed_tests_ext-__failed_tests_ext, __failed_tests_ext); \
+            __test_num_ext, \
+            __test_num_ext-__failed_tests_ext, __failed_tests_ext); \
     if (__failed_tests_ext) { \
         printf( MY_COLOR_YELLOW "=== WARNING === We have failed tests here..." MY_COLOR_RESET "\n\n"); \
         exit(1); \
