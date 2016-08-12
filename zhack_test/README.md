@@ -2,7 +2,7 @@
 
 通过测试代码，以及一步一步来学习redis源码。
 
-使用的工具：
+### 使用的工具：
 
 - gcc
 - gdb
@@ -19,7 +19,7 @@ $ gcc -D SDS_TEST_MAIN  -Wall -g hello_sds.c -o sds
 
 ```
 
-gdb 调试命令
+### gdb 调试命令
 
 1. 先设置断点
 2. run 运行程序
@@ -42,3 +42,9 @@ $25 = {
   buf = 0x602428 "foo"
 }
 ```
+
+### 测试
+
+测试用例结果高亮显示
+
+![测试用例](testhelp_ext.gif)
