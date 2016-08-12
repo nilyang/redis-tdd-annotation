@@ -1,4 +1,6 @@
 
+#ifndef __SDS_H
+#define __SDS_H
 
 #ifndef ZMALLOC_H
 #define ZMALLOC_H
@@ -51,3 +53,11 @@ sds sdscatlen(sds s, const void *t, size_t len);
 sds sdscat(sds s, const char * t);
 sds sdscatsds(sds s, const sds t);
 sds sdscpylen(sds s, const char *t, size_t len);
+
+/* Low level functions exposed to the user API */
+sds sdsMakeRoomFor(sds s, size_t addlen);
+void sdsIncrLen(sds s, int incr);
+sds sdsRemoveFreeSpace(sds s);
+size_t sdsAllocSize(sds s);
+
+#endif

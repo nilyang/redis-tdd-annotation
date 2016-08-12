@@ -84,7 +84,7 @@ sds sdsgrowzero(sds s, size_t len)
 
 //将长度为 len 的字符串 t 追加到 sds 字符串末尾
 //T=O(N)
-sds sdscatlen(sds s, const void *t, size_t len)
+sds sdscatlen_ext(sds s, const void *t, size_t len)
 {
     //1.计算旧字符串长度
     //2.新字符串长度
@@ -103,6 +103,31 @@ sds sdscatlen(sds s, const void *t, size_t len)
     //字符串拼接
     strcat(s, t);
 
+    return sh->buf;
+}
+
+/**
+ * 拼接sds字符串
+ */
+sds sdscatlen(sds s, const void *t, size_t len)
+{
+    struct sdshdr* sh;
+    // 原有字符串长度
+    size_t curlen = sdslen(s);
+
+    // 扩展原buf字段
+    s = sdsMakeRoomFor(s, len);
+
+    // 字符串相加
+    sh = (struct sdshdr *)(s - (sizeof(struct sdshdr)));
+    //T=O(N)
+    int i;
+    const char* tt = t;
+    for(i=0;i < len; i++){
+        sh->buf[curlen+i] = tt[i];
+    }
+
+    sh->buf[sh->len] = '\0';
     return sh->buf;
 }
 
@@ -131,6 +156,38 @@ sds sdscpylen(sds s, const char *t, size_t len)
     return (char *)"";
 }
 
+/**
+ * 对 sds 中 buf 的长度进行扩展，确保在函数执行之后，buf至少会有 addlen + 1 长度的空余空间
+ * （额外那 1 个字节是存放 \0 的）
+ *  
+ * 返回值
+ *  sds: 扩展成功返回扩展后的 sds 
+ *       扩展失败，返回 NULL
+ *  复杂度
+ *  T = O(N)
+ */
+sds sdsMakeRoomFor(sds s, size_t addlen)
+{
+    //1. 原来的数据
+    size_t cur_free = sdsavail(s);
+    struct sdshdr* sh = (void *)(s - (sizeof(struct sdshdr)));
+    
+    //2. 扩展空闲空间(+1是为了结束符\0)
+    size_t new_free = cur_free + addlen;
+    char * pbuf = zrealloc(s, new_free + 1);
+    
+    // 分配失败
+    if(!pbuf) return NULL;
+    // 分配成功
+    // if(pbuf != s);
+    
+    sh = (void *)(pbuf - (sizeof(struct sdshdr)));
+    sh->free = new_free;
+
+    return sh->buf;
+
+
+}
 #ifdef SDS_TEST_MAIN
 #include<stdio.h>
 #include<limits.h>
@@ -159,8 +216,12 @@ int main()
 
     //sds字符串拼接
     x = sdscat(x, "bar");
-    test_cond_ext("Strings concatenation",
-        sdslen(x)==5 && memcmp(x, "fobar\0", 6) == 0);
+
+    x = sdsMakeRoomFor(x, 10);
+
+    sdsfree(x);
+    // test_cond_ext("Strings concatenation",
+        // sdslen(x)==5 && memcmp(x, "fobar\0", 6) == 0);
     
 
     test_report_ext();
