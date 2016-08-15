@@ -60,6 +60,7 @@ sds sdscatlen(sds s, const void *t, size_t len);
 sds sdscat(sds s, const char * t);
 sds sdscatsds(sds s, const sds t);
 sds sdscpylen(sds s, const char *t, size_t len);
+sds sdscpy(sds s, const char *t);
 
 /* Low level functions exposed to the user API */
 sds sdsMakeRoomFor(sds s, size_t addlen);

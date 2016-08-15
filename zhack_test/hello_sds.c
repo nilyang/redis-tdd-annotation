@@ -108,6 +108,7 @@ sds sdscatlen_ext(sds s, const void *t, size_t len)
 
 /**
  * 拼接sds字符串
+ * 注意：完成调用之后，被修改的s将失效，新的字符串应该使用该函数的返回值
  */
 sds sdscatlen(sds s, const void *t, size_t len)
 {
@@ -138,6 +139,11 @@ sds sdscatlen(sds s, const void *t, size_t len)
     return sh->buf;
 }
 
+/*
+ * 拼接字符串 t 到 sds 末尾 
+ * 注意：完成调用之后，被修改的s将失效，新的字符串应该使用该函数的返回值
+ *
+ */
 sds sdscat(sds s, const char * t)
 {
     return sdscatlen(s,t,strlen(t));
@@ -154,13 +160,72 @@ void sdsclear(sds s)
     sh->buf[0] = '\0';
 }
 
+/*
+ * 将另一个 sds 追加到一个 sds 的末尾
+ * 注意：完成调用之后，被修改的s将失效，新的字符串应该使用该函数的返回值
+ * 
+ * 返回值
+ *   sds ： 追加成功返回新 sds， 失败返回 NULL
+ *
+ * 复杂度
+ *  T = O(N)
+ */
 sds sdscatsds(sds s, const sds t)
 {
-    return (char *)"";
+    return sdscatlen(s,t, sdslen(t));
 }
+
+/**
+ * 将指针t指向的字符串，复制len个字节到s中 
+ * 如果sds的长度少于len个字符，那么扩展sds
+ *
+ * 复杂度 T=O(N)
+ * 返回 
+ *  sds : 复制成功返回新的sds，否则返回NULL
+ *
+ * Destructively modify the sds string 's' to hold the specified binary
+ * safe string pointed by 't' of length 'len' bytes. 
+ */
 sds sdscpylen(sds s, const char *t, size_t len)
 {
-    return (char *)"";
+    struct sdshdr *sh = (void*)(s-(sizeof(struct sdshdr)));
+    
+    // 现有buf总长度
+    size_t buflen = sh->free + sh->len;
+    if(buflen < len){
+        // 扩展buf空间
+        s = sdsMakeRoomFor(s, len - sh->len);
+        if(s == NULL) return NULL;
+        sh = (void*)(s-(sizeof(struct sdshdr)));
+        buflen = sh->free + sh->len;
+    }
+
+    // copy buf contents
+    // T = O(N)
+    memcpy(s, t, len);
+    
+    // 添加终结符
+    s[len] = '\0';
+    
+    // 更新字段
+    sh->len = len;
+    sh->free = buflen - len;
+
+    return sh->buf;
+}
+
+/**
+ * 将字符串复制到 sds 当中，覆盖原有字符串。
+ * 
+ * 如果 sds 的长度少于字符串的长度，则扩展sds
+ *
+ * 复杂度 T=O(N)
+ * 返回值
+ *  sds ： 复制成功返回新的 sds ， 否则返回 NULL
+ */
+sds sdscpy(sds s, const char *t)
+{
+    return sdscpylen(s, t, strlen(t));
 }
 
 /**
@@ -237,6 +302,8 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
     newsh->free = newlen - len;
     return newsh->buf;
 }
+
+
 #ifdef SDS_TEST_MAIN
 #include<stdio.h>
 #include<limits.h>
@@ -256,20 +323,30 @@ int main()
     test_cond_ext("Create a string and obtain the length",
         sdslen(x) == 3 && ret == 0);
 
-    //测试生成指定长度sds
+    // 测试生成指定长度sds
     sdsfree(x);
     x = sdsnewlen("foo",2);
     test_cond_ext("Create a string with specified length",
         sdslen(x) == 2 && memcmp(x,"fo\0",3) == 0);
     
 
-    //sds字符串拼接
+    // sds字符串拼接
     x = sdscat(x, "bar");
     x = sdsMakeRoomFor(x, 10);
     test_cond_ext("Strings concatenation",
         sdslen(x)==5 && memcmp(x, "fobar\0", 6) == 0);
 
     sdsfree(x);
+
+    // sds拷贝
+    x = sdscpy(x,"a");
+    test_cond_ext("sdscpy() against an originally longer string",
+        sdslen(x) == 1 && memcmp(x,"a\0",2) == 0);
+
+    x = sdscpy(x,"xyzxxxxxxxxxxyyyyyyyyyykkkkkkkkkk");
+    test_cond_ext("sdscpy() against an originally shorter string",
+        sdslen(x) == 33 &&
+        memcmp(x,"xyzxxxxxxxxxxyyyyyyyyyykkkkkkkkkk\0",33) == 0);
 
 
     test_report_ext();
