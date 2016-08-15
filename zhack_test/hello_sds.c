@@ -124,12 +124,17 @@ sds sdscatlen(sds s, const void *t, size_t len)
     // 字符串相加
     sh = (struct sdshdr *)(s - (sizeof(struct sdshdr)));
     //T=O(N)
-    int i;
-    const char* tt = t;
-    for(i=0;i < len; i++){
-        sh->buf[curlen+i] = tt[i];
-    }
-    
+
+    // 手工拼接
+    // int i;
+    // const char* tt = t;
+    // for(i=0;i < len; i++){
+    //     sh->buf[curlen+i] = tt[i];
+    // }
+
+    //memcpy 安全拼接
+    memcpy(s+curlen, t, len);
+
     //更新字段
     sh->len = curlen + len;
     sh->free = sh->free - len;
@@ -331,10 +336,18 @@ int main()
     
 
     // sds字符串拼接
-    x = sdscat(x, "bar");
+    sdsfree(x);
+    x = sdsnew("foo");
+    // 扩展buf字段
     x = sdsMakeRoomFor(x, 10);
-    test_cond_ext("Strings concatenation",
-        sdslen(x)==5 && memcmp(x, "fobar\0", 6) == 0);
+    test_cond_ext("sdsMakeRoomFor() enlarge sds->buf size",
+        sdslen(x) == 3 && memcmp(x, "foo\0", 4) == 0);
+
+    sdsfree(x);
+    x = sdsnew("foo");
+    x = sdscat(x, "bar");
+    test_cond_ext("sdscat() foo + bar",
+        sdslen(x) == 6 && memcmp(x,"foobar\0", 6) == 0);
 
     sdsfree(x);
 
