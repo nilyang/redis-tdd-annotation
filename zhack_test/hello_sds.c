@@ -117,7 +117,9 @@ sds sdscatlen(sds s, const void *t, size_t len)
 
     // 扩展原buf字段
     s = sdsMakeRoomFor(s, len);
-
+    // 内存分配成功与否判定
+    if(s == NULL) return NULL;
+    
     // 字符串相加
     sh = (struct sdshdr *)(s - (sizeof(struct sdshdr)));
     //T=O(N)
@@ -126,8 +128,13 @@ sds sdscatlen(sds s, const void *t, size_t len)
     for(i=0;i < len; i++){
         sh->buf[curlen+i] = tt[i];
     }
-
+    
+    //更新字段
+    sh->len = curlen + len;
+    sh->free = sh->free - len;
+    //结尾添加结束符'\0'
     sh->buf[sh->len] = '\0';
+
     return sh->buf;
 }
 
@@ -166,7 +173,7 @@ sds sdscpylen(sds s, const char *t, size_t len)
  *  复杂度
  *  T = O(N)
  */
-sds sdsMakeRoomFor(sds s, size_t addlen)
+sds sdsMakeRoomFor_My(sds s, size_t addlen)
 {
     //1. 原来的数据
     size_t cur_free = sdsavail(s);
@@ -185,8 +192,50 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
     sh->free = new_free;
 
     return sh->buf;
+}
 
+/**
+ * 对 sds 中 buf 的长度进行扩展，确保在函数执行之后，
+ * buf 至少会有 addlen + 1 长度的空余空间
+ * （额外的 1 字节是为 \0 准备的）
+ * 复杂度
+ *  T = O(N)
+ */
+sds sdsMakeRoomFor(sds s, size_t addlen)
+{
+    //1. 获取 s 已占空间长度
+    //2. 如果 空闲空间足够，则直接返回 s，否则下一步扩容
+    //3. 计算需要扩容的空间大小
+    //4. zrealloc 分配扩容空间，成功则更新sds->free字段，否则返回NULL
+    //5. 结束
 
+    //0 初始化 
+    size_t free = sdsavail(s);
+    if(free >= addlen) return NULL;
+
+    size_t len,newlen;
+    struct sdshdr *sh=NULL, *newsh=NULL;
+
+    //1
+    len = sdslen(s);
+    sh = (struct sdshdr*)(s - (sizeof(struct sdshdr)));
+    
+    //扩容最少需要的长度
+    newlen = (len + addlen);
+
+    //根据新长度，为 s 分配新空间所需大小
+    //i) 扩容后空间小于SDS_MAX_PREALLOC，则分配两倍于所需长度（newlen）的空间
+    //ii) 扩容后空间若大于SDS_MAX_PREALLOC，则分配newlen+SDS_MAX_PREALLOC的空间
+    if (newlen < SDS_MAX_PREALLOC)
+        newlen *= 2;
+    else
+        newlen += SDS_MAX_PREALLOC; 
+
+    // 值得注意的是，计算sdshdr结构长度是因为，结构体本身带的动态数组buf不占空间
+    newsh = zrealloc(sh, sizeof(struct sdshdr) + newlen + 1);
+    // 更新free
+    newsh->free = newlen - len;
+    return newsh->buf;
 }
 #ifdef SDS_TEST_MAIN
 #include<stdio.h>
@@ -216,13 +265,12 @@ int main()
 
     //sds字符串拼接
     x = sdscat(x, "bar");
-
     x = sdsMakeRoomFor(x, 10);
+    test_cond_ext("Strings concatenation",
+        sdslen(x)==5 && memcmp(x, "fobar\0", 6) == 0);
 
     sdsfree(x);
-    // test_cond_ext("Strings concatenation",
-        // sdslen(x)==5 && memcmp(x, "fobar\0", 6) == 0);
-    
+
 
     test_report_ext();
     return 0;

@@ -12,6 +12,13 @@
 #define zstrdup strdup
 
 #endif
+/*
+ * 最大预分配长度
+ */
+#define SDS_MAX_PREALLOC (1024*1024)
+
+#include <sys/types.h>
+#include <stdarg.h>
 
 typedef char * sds;
 
