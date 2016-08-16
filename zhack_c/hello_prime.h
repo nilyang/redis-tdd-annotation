@@ -57,27 +57,26 @@ int isPrime(int x, int knownPrimes[], int numberOfKnownPrimes)
 }
 
 // 判断是否能被已知的且<x的素数整除
+// 求从2开始的m个素数
 int test_prime(void)
 {
-//初始化，得到小于查找数字n的素素表
-//依次排除所得素数的倍数，直到该倍数刚好小于N
-//接着下一轮循环
-    const int m = 100;
+    const int m = 20;
     int prime[m];//c99 standard
-    prime[0] = 2;
     int count  = 1;
     int i = 3;
+    for(i=0;i<m;i++)prime[i]=2;
+    // printf("%d\n",m);
+    i=3;
     while( count < m) {
         if (isPrime(i, prime, count)){
+            // printf("count=%d\n",count);
             prime[count++] = i;
         }
         i++;
     }
-
     for(i=0; i<m;i++){
-        printf("%d", prime[i]);
-        if( (i+1)%5)printf("\n");
-        else printf("\n");
+        printf("%d\t", prime[i]);
+        if( (i+1) % 5 == 0 ) printf("\n");
     }
     return 0;
 }

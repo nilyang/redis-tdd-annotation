@@ -5,15 +5,15 @@
 //#include"hello.h"
 #include "hello_prime.h"
 
-struct sdshdr{
-    unsigned int len;
-    unsigned int free;
-    char buf[];//zero length array,only allowd in struct's last element.
-};
+// struct sdshdr{
+//     unsigned int len;
+//     unsigned int free;
+//     char buf[];//zero length array,only allowd in struct's last element.
+// };
 
 int main()
 {
-    printf("sizeof(struct sdshdr)=%zu\n",sizeof(struct sdshdr));
+    // printf("sizeof(struct sdshdr)=%zu\n",sizeof(struct sdshdr));
 
     test_prime();
  
