@@ -12,10 +12,10 @@ sds sdsnewlen(const void *init, size_t initlen)
 
     if (init) {
         //zmalloc 不初始化内存
-        sh = zmalloc(sizeof(struct sdshdr) + initlen + 1);
+        sh = (struct sdshdr *)zmalloc(sizeof(struct sdshdr) + initlen + 1);
     } else {
         //zcalloc 将分配的内存全部初始化为0
-        sh = zcalloc(sizeof(struct sdshdr) + initlen + 1);
+        sh = (struct sdshdr *)zcalloc(sizeof(struct sdshdr) + initlen + 1);
     }
 
     // printf("initlen=%zu\n",initlen);
@@ -156,7 +156,7 @@ sds sdscat(sds s, const char * t)
 // 在不释放
 void sdsclear(sds s)
 {
-    struct sdshdr *sh = (void *)(s - (sizeof(struct sdshdr)));
+    struct sdshdr *sh = (struct sdshdr *)(s - (sizeof(struct sdshdr)));
 
     sh->free += sh->len;
     sh->len = 0;
@@ -193,7 +193,7 @@ sds sdscatsds(sds s, const sds t)
  */
 sds sdscpylen(sds s, const char *t, size_t len)
 {
-    struct sdshdr *sh = (void*)(s-(sizeof(struct sdshdr)));
+    struct sdshdr *sh = (struct sdshdr*)(s-(sizeof(struct sdshdr)));
     
     // 现有buf总长度
     size_t buflen = sh->free + sh->len;
@@ -327,7 +327,9 @@ int sdsull2str(char *s, unsigned long long v)
  */
 sds sdsfromlonglong(long long value) 
 {
-    return (sds)"";
+    char buf[SDS_LLSTR_SIZE];
+    int len = sdsll2str(buf,value);
+    return sdsnewlen(buf,len);
 }
 
 /* Like sdscatpritf() but gets va_list instead of being variadic. */
@@ -736,11 +738,23 @@ int main()
 
     //long long to string
     x = sdsMakeRoomFor(x,SDS_LLSTR_SIZE);
-    int lenx = sdsll2str(x, 2016082217LL);
-    printf("len=%d\n",lenx);
-    
+    long long llx =  2016082217LL;
+    int lenx = sdsll2str(x, llx);
+    test_cond_ext("sdsll2str() long long int to string",
+        lenx == 10 && memcmp(x,"2016082217\0", 11) == 0);
+
     sdsfree(x);
 
+    // size_t initlen = 10;
+    // struct sdshdr *sh = (struct sdshdr *)zmalloc(sizeof(struct sdshdr) + initlen + 1);
+    // printf("%p",sh);
+    // zfree(sh);
+
+    //sdsfromlonglong
+    // sds y = sdsfromlonglong(llx);
+    // test_cond_ext("sdsfromlonglong() long long to sds",
+    //     sdslen(y) == 10 && memcmp(y,"2016082217\0", 11) == 0);   
+    // sdsfree(y);
     test_report_ext();
     return 0;
 }

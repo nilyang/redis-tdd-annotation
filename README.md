@@ -27,8 +27,17 @@
 |_ zhack_c/    主要是c语言本身的学习用例，比如遇到不太懂的知识点，高级用法等
 
 ```
-###  [redis测试驱动学习方法说明](zhack_test/README.md)
+####  [redis测试驱动学习方法说明](zhack_test/README.md)
 
+####  [GDB挖掘内存溢出问题](zhack_test/GDB.md)
 
-###  [GDB挖掘内存溢出问题](zhack_test/GDB.md)
+### Docker
 
+####  [Docker](Dockerfile.md)
+
+所有的测用例，均使用 Docker 容器进行，[这里](zhack_docker/)给出了容器相关配置和使用说明
+
+### GDB 参考资料
+
+[RMS's gdb Debugger Tutorial](http://www.unknownroad.com/rtfm/gdbtut/gdbtoc.html)
+[Segmentation Fault Example](http://www.unknownroad.com/rtfm/gdbtut/gdbsegfault.html)
