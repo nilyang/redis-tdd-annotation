@@ -726,35 +726,51 @@ int main()
 
     sdsfree(x);
 
-    // sds拷贝
+    //{{{ sds拷贝
+    x = sdsnew("foo");
     x = sdscpy(x,"a");
     test_cond_ext("sdscpy() against an originally longer string",
         sdslen(x) == 1 && memcmp(x,"a\0",2) == 0);
-
+    
+    // sds拷贝大字符串
+    // sdsfree(x);
+    // x = sdsempty();
     x = sdscpy(x,"xyzxxxxxxxxxxyyyyyyyyyykkkkkkkkkk");
     test_cond_ext("sdscpy() against an originally shorter string",
         sdslen(x) == 33 &&
         memcmp(x,"xyzxxxxxxxxxxyyyyyyyyyykkkkkkkkkk\0",33) == 0);
 
-    //long long to string
+    //}}}
+
+    //{{{long long to string
+    sdsfree(x);
     x = sdsMakeRoomFor(x,SDS_LLSTR_SIZE);
     long long llx =  2016082217LL;
     int lenx = sdsll2str(x, llx);
     test_cond_ext("sdsll2str() long long int to string",
         lenx == 10 && memcmp(x,"2016082217\0", 11) == 0);
 
+    // 负数
+    llx = -922337203685477580LL;
+    lenx = sdsll2str(x,llx);
+    test_cond_ext("sdsll2str() negative long long int to string",
+        lenx == 19 && memcmp(x,"-922337203685477580\0",20) == 0);
+    
+    // 无符号正数
+    unsigned long long ullx = 18446744073709551615ULL;
+    lenx = sdsull2str(x,ullx);
+    test_cond_ext("sdsull2str() unsigned long long int to string ",
+        lenx == 20 && memcmp(x, "18446744073709551615\0", 21) == 0 );
+
+    // sdsfromlonglong test
+    llx = 9223372036854775807LL;
+    x = sdsfromlonglong(llx);
+    test_cond_ext("sdsfromlonglong() long long to sds",
+        sdslen(x) == 19 && memcmp(x,"9223372036854775807\0", 20) == 0);   
+    //}}}
     sdsfree(x);
 
-    // size_t initlen = 10;
-    // struct sdshdr *sh = (struct sdshdr *)zmalloc(sizeof(struct sdshdr) + initlen + 1);
-    // printf("%p",sh);
-    // zfree(sh);
 
-    //sdsfromlonglong
-    // sds y = sdsfromlonglong(llx);
-    // test_cond_ext("sdsfromlonglong() long long to sds",
-    //     sdslen(y) == 10 && memcmp(y,"2016082217\0", 11) == 0);   
-    // sdsfree(y);
     test_report_ext();
     return 0;
 }
