@@ -434,8 +434,150 @@ sds sdscatprintf(sds s, const char *fmt, ...)
  */
 sds sdscatfmt(sds s, char const *fmt, ...) 
 {
+    struct sdshdr *sh = (struct sdshdr *)(s - (sizeof(struct sdshdr)));
+    size_t initlen = sdslen(s);
+    const char *f =fmt;
+    int i;
+    va_list ap;// 定义可变参数列表(define argument list variable)
+    va_start(ap, fmt);//初始化可变参数列表，指向最后一个定义的参数(init list; point to last defined argument)
+    f = fmt;     // Next format specifier byte to process. 
+    i = initlen; // Position of the next byte to write to dest str.
+    //循环捕获变参fmt的每一个字节，决定格式样式
+    while(*f){
+        char next, *str;//下一个fmt字符，及
+        size_t valen;   //待格式化参数长度
+        long long num;  //带符号整数
+        unsigned long long unum;//无符号整数
 
-return (sds)"";
+        // Make sure there is always space for at least 1 char.
+        // 确保 s 至少具有1个字节空间可用
+        if(sh->free == 0){
+            s = sdsMakeRoomFor(s,1);
+            sh = (struct sdshdr*)(s-sizeof(struct sdshdr));
+        }
+
+        switch(*f){
+
+        //遇到格式化字符开头"%"符号，开始执行格式化
+        case '%':
+            // next = *(f+1);//指针后移1位，指向格式类型字符
+            // f++;          //同上 ，其实可以合并为 next = *(++f)
+            next = *(++f);   //合并上面两行代码
+            //格式化
+            switch(next){
+            case 's':
+            case 'S':
+                // %s - C String
+                // %S - SDS string
+                str = va_arg(ap, char *);//获取下一个参数(即...依次对应的参数)
+                valen = (next == 's') ? strlen(str):sdslen(str);
+                if(sh->free<valen){
+                    //free空间不足则重新分配valen个字节
+                    s = sdsMakeRoomFor(s,valen);
+                    //分配之后，重新计算sdshdr空间大小和指针首地址
+                    sh = (struct sdshdr*)(s-sizeof(struct sdshdr));
+                }
+                memcpy(s+i, str, valen);
+                sh->len += valen;
+                sh->free -= valen;
+                i += 1; //索引移动到fmt下一个字符                
+                break;
+                /*
+                memcpy示意图
+                i = sdslen(s)
+
+                1. sdsMakeRoomFor 之前
+                |--------|--------|
+                |        |  free  |
+                |--------|--------|
+                s        s+i       
+
+                2.sdsMakeRoomFor 之后
+
+                条件： sh->free < valen ,则扩大 s 空间，分配s以不小于 (i+valen)*2的空间
+                memcpy操作从 s+i 位置开始，将当前可变参数str拷贝valen个字节到该位置
+                注意：，目的是使用剩余空间将str拼接到s上
+
+                |----------------|--...--|
+                |                |  free |
+                |----------------|--...--|
+                s              newp=s+i+valen  
+
+                sh->len += valen;
+                sh->free -= valen;
+                */
+
+            case 'i':
+            case 'I':
+                //带符号数字转sds处理
+                // %i - signed int
+                // %I - 64 bit signed integer (long long, int64_t)
+                if(next == 'i')
+                    num = va_arg(ap, int);
+                else
+                    num = va_arg(ap, long long);
+                {
+                    char buf[SDS_LLSTR_SIZE];
+                    valen = sdsll2str(buf,num);
+                    if(sh->free < valen){
+                        s = sdsMakeRoomFor(s,valen);
+                        sh = (struct sdshdr *)(s-sizeof(struct sdshdr));
+                    }
+                    memcpy(s, buf, valen);
+                    sh->len += valen;
+                    sh->free -= valen;
+                    i += 1;//索引移动到下一位
+                }
+                break;
+            case 'u':
+            case 'U':
+                //无符号数字转sds处理
+                // %u - unsigned int
+                // %U - 64 bit unsigned integer (unsigned long long, uint64_t)
+                if (next == 'u')
+                    unum = va_arg(ap, unsigned int);
+                else 
+                    unum = va_arg(ap, unsigned long long);
+                {
+                    char buf[SDS_LLSTR_SIZE];
+                    valen = sdsull2str(buf, unum);
+                    if(sh->free < valen){
+                        s = sdsMakeRoomFor(s, valen);
+                        sh = (struct sdshdr *)(s - sizeof(struct sdshdr));
+                    }
+                    memcpy(s+i,buf,valen);
+                    sh->len += valen;
+                    sh->free -= valen;
+                    i += 1;
+                }
+                break;
+            case '%':
+            default:
+                /* Handle %% and generally %<unknown>. */
+                // %% - Verbatim "%" character.
+                s[i++] = next;
+                s->len += 1;
+                s->free -= 1;
+                break;
+            }
+            break;
+            
+        //普通字符，直接拼接到s末尾
+        default:
+            s[i++] = *f; //照应循环开头的if(sh->free==0)的判定，每次只需保证容纳下1个字符
+            sh->len += 1;
+            sh->free -= 1;
+            break;
+        }
+        f++;
+    }
+    
+    va_end(ap);//清空可变参数列表
+
+    /* Add null-term */
+    s[i] = '\0';//惯例末尾加结束符
+
+    return s;
 }
 
 /* Remove the part of the string from left and from right composed just of
