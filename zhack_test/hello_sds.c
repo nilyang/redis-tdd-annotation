@@ -332,14 +332,64 @@ sds sdsfromlonglong(long long value)
     return sdsnewlen(buf,len);
 }
 
-/* Like sdscatpritf() but gets va_list instead of being variadic. */
+/* 
+ * sds无限制参数格式化打印字符串函数，并将格式化后的字符串拼接到sds之后
+ * 注意：被 sdscatprintf() 所调用， 本函数的 va_list  配合调用者的  varandic 以实现可变参数功能
+ * 复杂度： T=O(N^2)
+ * 使用到 vsnprintf : http://china.qnx.com/developers/docs/6.4.1/neutrino/lib_ref/v/vsnprintf.html
+ * Like sdscatprintf() but gets va_list instead of being variadic. 
+ */
 sds sdscatvprintf(sds s, const char *fmt, va_list ap) 
 {
-    return (sds)"";
+    va_list cpy;
+    char staticbuf[1024], *buf = staticbuf, *t;
+    size_t buflen = strlen(fmt)*2;
+
+    // 尝试使用静态缓冲来加速，如果不行则反过来使用堆分配空间
+    // We try to start using a static buffer for speed.
+    // If not possible we revert to heap allocation. 
+    if(buflen>sizeof(staticbuf)){
+        buf = zmalloc(buflen);
+        if(buf == NULL) return NULL;
+    }else{
+        buflen = sizeof(staticbuf);
+    }
+    
+    // 每次vsnsprintf失败之后，重置buf，并尝试将buf扩大2倍
+    // （行为类似 sdsMakeRoomFor ）以适应当前buf大小
+    // Try with buffers two times bigger every time we fail to
+    // fit the string in the current buffer size.
+    while(1){
+        buf[buflen-2] = '\0';//TODO 为啥呢?
+        va_copy(cpy, ap);//c99,c++11
+        //T=O(N)
+        vsnprintf(buf, buflen, fmt, cpy);
+        va_end(cpy);//注意：huangz1990注解版漏了这句，估计是他注解到时候手抖...
+
+        // 如果失败基本上是cpy参数超出了buf长度
+        // （如果buf和起初位置不等，则清空buf）然后重新分配空间，重试参数格式化(这里使用了while循环来实现)
+        if(buf[buflen-2]!='\0'){
+            if(buf!= staticbuf)zfree(buf);
+            buflen *= 2;
+            buf = zmalloc(buflen);
+            if(buf == NULL) return NULL;
+            continue;
+        }
+        break;
+    }
+
+    //Finally concat the obtained string to the SDS string and return it.
+    t = sdscat(s, buf);
+    if (buf != staticbuf) zfree(buf);
+
+    return t;
 }
 
 
-/* Append to the sds string 's' a string obtained using printf-alike format
+/* 
+ * 将 printf-alike 格式的字符串，拼接到sds字符之后 
+ *
+ * Append to the sds string 's' a string obtained using printf-alike format
  * specifier.
  *
  * After the call, the modified sds string is no longer valid and all the
@@ -357,7 +407,12 @@ sds sdscatvprintf(sds s, const char *fmt, va_list ap)
  */
 sds sdscatprintf(sds s, const char *fmt, ...) 
 {
-return (sds)"";
+    va_list ap;
+    char *t;
+    va_start(ap, fmt);
+    t = sdscatvprintf(s, fmt, ap);
+    va_end(ap);
+    return t;
 }
 
 
@@ -768,9 +823,21 @@ int main()
     test_cond_ext("sdsfromlonglong() long long to sds",
         sdslen(x) == 19 && memcmp(x,"9223372036854775807\0", 20) == 0);   
     //}}}
+
+    //{{{
+    //sdscatprintf
     sdsfree(x);
-
-
+    x = sdscatprintf(sdsempty(),"%d",123);
+    test_cond_ext("sdscatprintf() seems working in the base case",
+        sdslen(x) == 3 && memcmp(x,"123\0",4) == 0)
+    
+    sdsfree(x);
+    x = sdscatprintf(sdsnew("I'am a very large number string ,yes "),"unsigned long long int = %llu",ullx);
+    test_cond_ext("sdscatprintf() sds + (unsigned long long int)",
+        sdslen(x) == 82 && memcmp(x,"I'am a very large number string ,yes unsigned long long int = 18446744073709551615\0",83) == 0);
+    // printf("%s\n",x);
+    //}}}
+    
     test_report_ext();
     return 0;
 }
