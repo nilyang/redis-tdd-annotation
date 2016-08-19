@@ -48,3 +48,10 @@ $25 = {
 测试用例结果高亮显示
 
 ![测试用例](testhelp_ext.gif)
+
+
+这是使用 Visual Studio Community 2015 分析的截图
+
+对于非常棘手的问题，也可以通过这个家伙来调试
+
+![sds数据结构内存状态](sdshdr_sds_relation.png)
