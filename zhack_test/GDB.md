@@ -253,4 +253,4 @@ int main()
 全文完，谢谢观赏！欢迎各位大神批评指正~
 
 ## 附录 gcc+valgrind build的 过程
-[gcc_valgrind.png](gcc_valgrind.png)
+![gcc_valgrind.png](gcc_valgrind.png)
