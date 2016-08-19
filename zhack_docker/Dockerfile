@@ -11,7 +11,8 @@ RUN \
   apt-get -y upgrade && \
   apt-get install -y build-essential autoconf pkg-config && \
   apt-get install -y software-properties-common net-tools && \
-  apt-get install -y byobu curl git htop man unzip vim wget gcc gdb gdbserver 
+  apt-get install -y byobu curl git htop man unzip vim wget gcc && \
+  apt-get install -y gdb gdbserver valgrind valgrind-gdb
   
 RUN apt-get install -y openssh-server sudo
 

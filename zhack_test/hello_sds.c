@@ -416,7 +416,10 @@ sds sdscatprintf(sds s, const char *fmt, ...)
 }
 
 
-/* This function is similar to sdscatprintf, but much faster as it does
+/**
+ * 类似 sdscatprintf()  ，不使用 vsnprintf 来实现格式化参数解析
+ *
+ * This function is similar to sdscatprintf, but much faster as it does
  * not rely on sprintf() family functions implemented by the libc that
  * are often very slow. Moreover directly handling the sds string as
  * new data is concatenated provides a performance improvement.
@@ -439,6 +442,7 @@ sds sdscatfmt(sds s, char const *fmt, ...)
     const char *f =fmt;
     int i;
     va_list ap;// 定义可变参数列表(define argument list variable)
+
     va_start(ap, fmt);//初始化可变参数列表，指向最后一个定义的参数(init list; point to last defined argument)
     f = fmt;     // Next format specifier byte to process. 
     i = initlen; // Position of the next byte to write to dest str.
@@ -556,8 +560,8 @@ sds sdscatfmt(sds s, char const *fmt, ...)
                 /* Handle %% and generally %<unknown>. */
                 // %% - Verbatim "%" character.
                 s[i++] = next;
-                s->len += 1;
-                s->free -= 1;
+                sh->len += 1;
+                sh->free -= 1;
                 break;
             }
             break;
@@ -928,58 +932,82 @@ int main()
     x = sdscpy(x,"a");
     test_cond_ext("sdscpy() against an originally longer string",
         sdslen(x) == 1 && memcmp(x,"a\0",2) == 0);
+    sdsfree(x);
     
     // sds拷贝大字符串
-    // sdsfree(x);
-    // x = sdsempty();
+    x = sdsempty();
     x = sdscpy(x,"xyzxxxxxxxxxxyyyyyyyyyykkkkkkkkkk");
     test_cond_ext("sdscpy() against an originally shorter string",
         sdslen(x) == 33 &&
         memcmp(x,"xyzxxxxxxxxxxyyyyyyyyyykkkkkkkkkk\0",33) == 0);
+    sdsfree(x);
 
     //}}}
 
     //{{{long long to string
-    sdsfree(x);
-    x = sdsMakeRoomFor(x,SDS_LLSTR_SIZE);
+    x = sdsMakeRoomFor(sdsempty(),SDS_LLSTR_SIZE);
     long long llx =  2016082217LL;
     int lenx = sdsll2str(x, llx);
     test_cond_ext("sdsll2str() long long int to string",
         lenx == 10 && memcmp(x,"2016082217\0", 11) == 0);
+    sdsfree(x);
 
     // 负数
+    x = sdsMakeRoomFor(sdsempty(),SDS_LLSTR_SIZE);
     llx = -922337203685477580LL;
     lenx = sdsll2str(x,llx);
     test_cond_ext("sdsll2str() negative long long int to string",
         lenx == 19 && memcmp(x,"-922337203685477580\0",20) == 0);
-    
+    sdsfree(x); 
+
     // 无符号正数
+    x = sdsMakeRoomFor(sdsempty(),SDS_LLSTR_SIZE);
     unsigned long long ullx = 18446744073709551615ULL;
     lenx = sdsull2str(x,ullx);
     test_cond_ext("sdsull2str() unsigned long long int to string ",
         lenx == 20 && memcmp(x, "18446744073709551615\0", 21) == 0 );
+    sdsfree(x); 
 
     // sdsfromlonglong test
     llx = 9223372036854775807LL;
     x = sdsfromlonglong(llx);
     test_cond_ext("sdsfromlonglong() long long to sds",
-        sdslen(x) == 19 && memcmp(x,"9223372036854775807\0", 20) == 0);   
+        sdslen(x) == 19 && memcmp(x,"9223372036854775807\0", 20) == 0);  
+    sdsfree(x); 
     //}}}
 
     //{{{
     //sdscatprintf
-    sdsfree(x);
     x = sdscatprintf(sdsempty(),"%d",123);
     test_cond_ext("sdscatprintf() seems working in the base case",
         sdslen(x) == 3 && memcmp(x,"123\0",4) == 0)
-    
     sdsfree(x);
+    
     x = sdscatprintf(sdsnew("I'am a very large number string ,yes "),"unsigned long long int = %llu",ullx);
     test_cond_ext("sdscatprintf() sds + (unsigned long long int)",
         sdslen(x) == 82 && memcmp(x,"I'am a very large number string ,yes unsigned long long int = 18446744073709551615\0",83) == 0);
     // printf("%s\n",x);
+    sdsfree(x);
     //}}}
-    
+
+    //{{{ sdscatfmt test
+    //1. sdscatfmt signed int/long
+    x = sdsnew("--");
+    x = sdscatfmt(x, "Hello %s World %I,%I--", "Hi!", LLONG_MIN,LLONG_MAX);
+    test_cond_ext("sdscatfmt() seems working in the base case",
+        sdslen(x) == 60 &&
+        memcmp(x,"--Hello Hi! World -9223372036854775808,"
+                    "9223372036854775807--",60) == 0)
+    sdsfree(x);
+
+    //2.sdscatfmt unsigned int/long long
+    x = sdsnew("--");
+    x = sdscatfmt(x, "%u,%U--", UINT_MAX, ULLONG_MAX);
+    test_cond_ext("sdscatfmt() seems working with unsigned numbers",
+        sdslen(x) == 35 &&
+        memcmp(x,"--4294967295,18446744073709551615--",35) == 0)
+    sdsfree(x);
+    //}}}
     test_report_ext();
     return 0;
 }
