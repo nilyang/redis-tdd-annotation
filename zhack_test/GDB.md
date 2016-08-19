@@ -253,4 +253,14 @@ int main()
 全文完，谢谢观赏！欢迎各位大神批评指正~
 
 ## 附录 gcc+valgrind build的 过程
+
+`./build.sh` 结合了下面两条命令，结果如下图所示，调试的时候很方便，再也不用翻两条（history）记录了
+
+```
+gcc -D SDS_TEST_MAIN  -Wall  -ggdb  hello_sds.c -o sds
+
+valgrind --vgdb=yes --leak-check=full ./sds
+
+```
+
 ![gcc_valgrind.png](gcc_valgrind.png)
