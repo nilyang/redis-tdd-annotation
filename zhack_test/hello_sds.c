@@ -589,7 +589,12 @@ sds sdscatfmt(sds s, char const *fmt, ...)
 }
 
 
-/* Remove the part of the string from left and from right composed just of
+/* 
+ * 不区分大小写 trim
+ * 
+ * 自己实现的复杂度： T=O(N*M) N=sds length,M =cset length 
+ * 官方使用了strchr，复杂度T=O(N*M) 差不多，性能没有对比过
+ * Remove the part of the string from left and from right composed just of
  * contiguous characters found in 'cset', that is a null terminted C string.
  *
  * After the call, the modified sds string is no longer valid and all the
@@ -605,7 +610,65 @@ sds sdscatfmt(sds s, char const *fmt, ...)
  */
 sds sdstrim(sds s, const char *cset) 
 {
-return (sds)"";
+    //思想，删除左侧，如果左侧删除完毕，则将剩余字符串整体左移
+    struct sdshdr *ps = (struct sdshdr*)(s - sizeof(struct sdshdr));
+    size_t len = sdslen(s);
+    char *pstart = s,         //pstart 指向s初始字符
+         *pend = (s + len -1),//pend 指向s末尾字符 不能从'\0'往回走，要提前一位
+         *pcset;
+
+    //修建算法的官方实现方式比较巧妙，主要利用了strchr函数
+    //下面是我的实现
+
+    //循环剔除左边
+    int find=0;
+    while(*pstart!='\0'){
+        pcset = (char *)cset;
+        while(*pcset!='\0'){
+            if(strncasecmp(pstart,pcset,1) == 0){
+                pstart += 1;//右移1位，继续比较
+                find = 1;
+                break;
+            }
+            find = 0;
+            pcset +=1;
+        }
+
+        if(find == 0){
+            break;//trim left 结束
+        }
+    }
+
+    //循环剔除右边
+    find = 0;
+    while(pend!=pstart){
+        pcset = (char*)cset;
+        while(*pcset!='\0'){
+            if(strncasecmp(pend,pcset,1) == 0){
+                pend -= 1;//右移1位，继续比较
+                find = 1;
+                break;
+            }
+            find = 0;
+            pcset +=1;
+        }
+
+        if(find == 0){
+            break;//trim left 结束
+        }
+    }
+
+    //计算最后的长度
+    len = pend > pstart? (pend - pstart + 1):0;
+    //左移
+    if(pstart != s)memmove(s, pstart, len);
+    //末尾终结符
+    s[len]='\0';
+    //更新字段
+    ps->free = ps->free + (ps->len - len);
+    ps->len = len;
+
+    return s;
 }
 
 /* Turn the string into a smaller (or equal) string containing only the
@@ -1011,6 +1074,16 @@ int main()
     test_cond_ext("sdscatfmt() seems working with unsigned numbers",
         sdslen(x) == 35 &&
         memcmp(x,"--4294967295,18446744073709551615--",35) == 0)
+    sdsfree(x);
+    //}}}
+
+    //{{{
+    x = sdsnew("AA...AA.a.aa.aHelloWorld     :::");
+    x = sdstrim(x,"A. :");
+    //HelloWorld
+    test_cond_ext("sdstrim() correctly trims characters",
+        sdslen(x) == 10 && memcmp(x,"HelloWorld\0",11) == 0)
+
     sdsfree(x);
     //}}}
     test_report_ext();
