@@ -689,7 +689,46 @@ sds sdstrim(sds s, const char *cset)
  */
 void sdsrange(sds s, int start, int end) 
 {
+    // *ps可以优化到最后初始化
+    // struct sdshdr  *ps = (struct sdshdr*)(s-sizeof(struct sdshdr));
+    size_t newlen = 0,
+           len = sdslen(s);
 
+    if(len==0)return;
+    //负数转换为正数
+    if(start<0){
+        start = len + start;
+        if(start<0) start = 0;
+    }
+
+    if(end<0){
+        end = len + end;
+        if(end<0) end = 0;
+    }
+
+    newlen = (start > end) ? 0 : (end - start + 1);
+    if(newlen != 0){
+        // 依次处理 start/end 超出范围的情况
+        if(start >= (signed)len){
+            newlen = 0;
+        }else if(end >= (signed)len){
+            end = len - 1;
+            newlen = (start > end)?0:(end - start + 1);
+        }
+    }else{
+        start = 0;
+    }
+
+    //如果需要移动则操作之
+    if(start&&newlen) memmove(s,s+start,newlen);
+    
+    //设置字符串结束符
+    s[newlen] = '\0';
+    //更新属性
+    struct sdshdr  *ps = (struct sdshdr*)(s-sizeof(struct sdshdr));
+    
+    ps->free = ps->free + (len - newlen);
+    ps->len = newlen; 
 }
 
 /* Apply tolower() to every character of the sds string 's'. */
@@ -1084,6 +1123,63 @@ int main()
     test_cond_ext("sdstrim() correctly trims characters",
         sdslen(x) == 10 && memcmp(x,"HelloWorld\0",11) == 0)
 
+    sdsfree(x);
+    //}}}
+
+
+    //{{{ sdsrange test
+    x = sdsnew("ciao");
+    sdsrange(x,1,1);
+    test_cond_ext("sdsrange(...,1,1)",
+        sdslen(x) == 1 && memcmp(x,"i\0",2) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,1,-1);
+    test_cond_ext("sdsrange(...,1,-1)",
+        sdslen(x) == 3 && memcmp(x,"iao\0",4) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,-2,-1);
+    test_cond_ext("sdsrange(...,-2,-1)",
+        sdslen(x) == 2 && memcmp(x,"ao\0",3) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,-1,-1);
+    test_cond_ext("sdsrange(...,-1,-1)",
+        sdslen(x) == 1 && memcmp(x,"o\0",2) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,-1,-2);
+    test_cond_ext("sdsrange(...,-1,-2)",
+        sdslen(x) == 0 && memcmp(x,"\0",1) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,-1,-100);
+    test_cond_ext("sdsrange(...,1,-100)",
+        sdslen(x) == 0 && memcmp(x,"\0",1) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,2,1);
+    test_cond_ext("sdsrange(...,2,1)",
+        sdslen(x) == 0 && memcmp(x,"\0",1) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,1,100);
+    test_cond_ext("sdsrange(...,1,100)",
+        sdslen(x) == 3 && memcmp(x,"iao\0",4) == 0)
+    sdsfree(x);
+
+    x = sdsnew("ciao");
+    sdsrange(x,100,100);
+    test_cond_ext("sdsrange(...,100,100)",
+        sdslen(x) == 0 && memcmp(x,"\0",1) == 0)
     sdsfree(x);
     //}}}
     test_report_ext();
