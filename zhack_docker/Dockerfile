@@ -15,6 +15,7 @@ RUN \
   apt-get install -y gdb gdbserver valgrind valgrind-gdb
   
 RUN apt-get install -y openssh-server sudo
+RUN apt-get install -y lrzsz
 
 RUN mkdir /var/run/sshd
 RUN echo 'root:123456' | chpasswd
@@ -32,6 +33,11 @@ RUN echo 'admin:123456' | chpasswd
 
 # sudoer
 RUN echo 'admin	ALL=(ALL)	NOPASSWD:ALL' >> /etc/sudoers
+
+# locale
+RUN echo "LANG=\"zh_CN.UTF-8\"" >> /etc/default/locale && \
+    echo "LANGUAGE=\"zh_CN:zh\"" >> /etc/default/locale
+
 
 #USER admin
 #WORKDIR /data

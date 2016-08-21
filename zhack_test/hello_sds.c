@@ -734,13 +734,21 @@ void sdsrange(sds s, int start, int end)
 /* Apply tolower() to every character of the sds string 's'. */
 void sdstolower(sds s) 
 {
-
+    size_t len=sdslen(s),i;
+    //利用glibc库函数 tolower()
+    for(i=0; i<len; i++){
+        s[i] = tolower(s[i]);
+    }
 }
 
 /* Apply toupper() to every character of the sds string 's'. */
 void sdstoupper(sds s) 
 {
-
+    size_t len=sdslen(s),i;
+    //利用库函数 toupper()
+    for(i=0; i<len; i++){
+        s[i] = toupper(s[i]);
+    }
 }
 
 
@@ -757,7 +765,32 @@ void sdstoupper(sds s)
  * the smaller one. */
 int sdscmp(const sds s1, const sds s2) 
 {
-return 0;
+    //自己的实现
+    size_t len1=sdslen(s1), len2=sdslen(s2);
+    int result;
+
+    ///版本1
+
+    // if(len1 >= len2){
+    //     result = memcmp(s1,s2, len2);
+    //     if(result==0 && len1>len2){
+    //         result = 1;//长的大
+    //     }
+    // }else{
+    //     result = memcmp(s1,s2, len1);
+    //     if(result==0){
+    //         result = -1;
+    //     }
+    // }
+
+    /// 版本2(for优化)
+    size_t diff=len1-len2, cmplen;
+    cmplen = diff >= 0 ? len1 : len2;
+    result = memcmp(s1, s2, cmplen);
+    if(result==0 && diff>0){
+        result = 1;
+    }
+    return result;
 }
 
 /* Split 's' with separator in 'sep'. An array
@@ -964,7 +997,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
 
     //0 初始化 
     size_t free = sdsavail(s);
-    if(free >= addlen) return NULL;//bugfix 不应该返回NULL
+    if(free >= addlen) return s;//bugfix 不应该返回NULL
 
     size_t len,newlen;
     struct sdshdr *sh=NULL, *newsh=NULL;
@@ -1181,6 +1214,28 @@ int main()
     test_cond_ext("sdsrange(...,100,100)",
         sdslen(x) == 0 && memcmp(x,"\0",1) == 0)
     sdsfree(x);
+    //}}}
+
+    //{{{
+    sds y;
+    x = sdsnew("foo");
+    y = sdsnew("foa");
+    test_cond_ext("sdscmp(foo,foa)", sdscmp(x,y) > 0)
+    sdsfree(y);
+    sdsfree(x);
+
+    x = sdsnew("bar");
+    y = sdsnew("bar");
+    test_cond_ext("sdscmp(bar,bar)", sdscmp(x,y) == 0)
+    sdsfree(y);
+    sdsfree(x);
+
+    x = sdsnew("aar");
+    y = sdsnew("bar");
+    test_cond_ext("sdscmp(bar,bar)", sdscmp(x,y) < 0)
+    sdsfree(y);
+    sdsfree(x);
+
     //}}}
     test_report_ext();
     return 0;
