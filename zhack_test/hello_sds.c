@@ -153,6 +153,31 @@ sds sdscat(sds s, const char * t)
 {
     return sdscatlen(s,t,strlen(t));
 }
+
+/*
+ * 备注：该函数貌似没有使用到
+ *
+ * Set the sds string length to the length as obtained with strlen(), so
+ * considering as content only up to the first null term character.
+ *
+ * This function is useful when the sds string is hacked manually in some
+ * way, like in the following example:
+ *
+ * s = sdsnew("foobar");
+ * s[2] = '\0';
+ * sdsupdatelen(s);
+ * printf("%d\n", sdslen(s));
+ *
+ * The output will be "2", but if we comment out the call to sdsupdatelen()
+ * the output will be "6" as the string was modified but the logical length
+ * remains 6 bytes. */
+void sdsupdatelen(sds s) {
+    struct sdshdr *sh = (void*) (s-(sizeof(struct sdshdr)));
+    int reallen = strlen(s);
+    sh->free += (sh->len-reallen);
+    sh->len = reallen;
+}
+
 // 在不释放
 void sdsclear(sds s)
 {
@@ -824,7 +849,80 @@ int sdscmp(const sds s1, const sds s2)
  */
 sds *sdssplitlen(const char *s, int len, const char *sep, int seplen, int *count) 
 {
-return (sds *)"";
+    if(len < 0 || seplen < 1 ) return NULL;
+
+
+    //字符串查找
+    /*
+    +-----+-----+-----+
+    |f|o|o|_|-|_|b|a|r|
+s-> +-----+-----+-----+
+    ^-tmp-^-sep-^      
+    | len | len |
+   ps    pfind  ps=(ps+tmplen+seplen)
+    */
+    //初始化变量
+    sds *sdsarr, ps=(char *)s, pfind;
+    size_t tmplen;
+    int ifok = 1, slots=5, index=0;
+    *count = 0;
+
+    //初始化sds数组
+    sdsarr = (sds*)zmalloc(sizeof(sds)*slots);
+    if(sdsarr==NULL) return NULL;
+    if(len==0){
+        return sdsarr;
+    }
+
+    do{
+        // 扩容,末尾要留给最后一个字符串
+        if(slots < index+2){
+            sds *tmparr;
+            slots *= 2;//元素个数按当前长度成倍增长
+            tmparr =(sds *)zrealloc(sdsarr,sizeof(sds)*slots);
+            if(tmparr==NULL){ 
+                ifok=0; break;
+            }
+            sdsarr = tmparr;
+        }
+
+        //find first position
+        pfind = strstr(ps, sep);
+        //这里可能是第一个或者最后一个
+        if(pfind == NULL) {
+            sds tmp = sdsnewlen(ps, strlen(ps));
+            if(tmp == NULL) {
+                ifok=0;
+            }else{
+                sdsarr[index] = tmp;
+            }
+            break;
+        }
+
+        //计算当前切分的第一个字符串长度
+        tmplen = (pfind-ps);
+        sds tmp = sdsnewlen("",tmplen);//初始化
+        if(memcpy(tmp, ps, tmplen) == NULL) {
+            ifok = 0;
+            break;
+        }
+
+        sdsarr[index] = tmp;
+        ps += (tmplen+seplen);//移动指针到下一个位置（跳过sep)
+        index++;
+    }while(1);
+
+    if(ifok == 0){
+        for(int i=0; i < index;i++){
+            sdsfree(sdsarr[i]);
+        }
+        zfree(sdsarr);
+        *count = 0 ;
+    }else{
+        *count = index+1;
+    }
+ 
+return sdsarr;
 }
 
 /* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. */
@@ -1237,14 +1335,43 @@ int main()
     sdsfree(x);
 
     //}}}
-    
+
     //{{{ sdssplitlen test
-    // const char * s = "foo_-zbar";
-    // const char * sep = "_-z";
-    // int count;
-    // sds *sdsarr = sdssplitlen(s, sdslen(s), sep, strlen(sep),&count);
-    
+    {
+        const char * s = "foo_-zbar";
+        const char * sep = "_-z";
+        int count,j;
+        sds *tmparr = sdssplitlen(s, strlen(s), sep, strlen(sep),&count);
+        if(tmparr){      
+            // pstart[length] = '\0';
+            // printf("%p,%c\n",tmp, *tmp);
+            // if(tmp)zfree(tmp);
+            char *tmp = (char*)malloc(sizeof(char)*80);
+            tmp[0] = '[';
+            tmp[1] = '\0';
+            // tmp = ""; //这里不能通过字符串赋值方式来memcpy？为什么？会发生踩内存错误
+            // memcpy(tmp+1, "123456789", 10);
+            size_t length = 1;
+            for(j=0;j<count;j++){
+                size_t lenx = sdslen(tmparr[j]);
+                //printf("len=%zu,item=%s\n", lenx,tmparr[j]);
+                memcpy(tmp+length, tmparr[j], lenx+1);
+                length += lenx;
+            }
+            tmp[length]=']';
+            tmp[length+1] = '\0';
+            test_cond_ext("sdssplitlen('foo_-zbar',9,'_-z',3,&count)= foobar",
+                memcmp(tmp,"[foobar]",9) == 0)
+            //printf("%s\n", tmp);
+            if(tmp)zfree(tmp);
+            for(j=0;j<count;j++)
+                sdsfree(tmparr[j]);
+            if(tmparr) zfree(tmparr);
+        }
+    }
     //}}}
+
+    
     test_report_ext();
     return 0;
 }
