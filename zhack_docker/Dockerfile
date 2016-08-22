@@ -11,9 +11,9 @@ RUN \
   apt-get -y upgrade && \
   apt-get install -y build-essential autoconf pkg-config && \
   apt-get install -y software-properties-common net-tools && \
-  apt-get install -y byobu curl git htop man unzip vim wget gcc && \
-  apt-get install -y gdb gdbserver valgrind valgrind-gdb
-  
+  apt-get install -y byobu curl git htop man unzip vim wget gcc
+
+RUN apt-get install -y gdb gdbserver valgrind valgrind-dbg
 RUN apt-get install -y openssh-server sudo
 RUN apt-get install -y lrzsz
 
@@ -37,7 +37,6 @@ RUN echo 'admin	ALL=(ALL)	NOPASSWD:ALL' >> /etc/sudoers
 # locale
 RUN echo "LANG=\"zh_CN.UTF-8\"" >> /etc/default/locale && \
     echo "LANGUAGE=\"zh_CN:zh\"" >> /etc/default/locale
-
 
 #USER admin
 #WORKDIR /data

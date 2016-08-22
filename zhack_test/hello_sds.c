@@ -1149,7 +1149,7 @@ int main()
     sdsfree(x);
     //}}}
 
-    //{{{
+    //{{{ sdstrim test
     x = sdsnew("AA...AA.a.aa.aHelloWorld     :::");
     x = sdstrim(x,"A. :");
     //HelloWorld
@@ -1216,7 +1216,7 @@ int main()
     sdsfree(x);
     //}}}
 
-    //{{{
+    //{{{ sdscmp test
     sds y;
     x = sdsnew("foo");
     y = sdsnew("foa");
@@ -1236,6 +1236,14 @@ int main()
     sdsfree(y);
     sdsfree(x);
 
+    //}}}
+    
+    //{{{ sdssplitlen test
+    // const char * s = "foo_-zbar";
+    // const char * sep = "_-z";
+    // int count;
+    // sds *sdsarr = sdssplitlen(s, sdslen(s), sep, strlen(sep),&count);
+    
     //}}}
     test_report_ext();
     return 0;
