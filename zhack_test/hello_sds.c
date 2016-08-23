@@ -1154,6 +1154,70 @@ sds sdsMakeRoomFor(sds s, size_t addlen)
     return newsh->buf;
 }
 
+/* Increment the sds length and decrements the left free space at the
+ * end of the string according to 'incr'. Also set the null term
+ * in the new end of the string.
+ *
+ * This function is used in order to fix the string length after the
+ * user calls sdsMakeRoomFor(), writes something after the end of
+ * the current string, and finally needs to set the new length.
+ *
+ * Note: it is possible to use a negative increment in order to
+ * right-trim the string.
+ *
+ * Usage example:
+ *
+ * Using sdsIncrLen() and sdsMakeRoomFor() it is possible to mount the
+ * following schema, to cat bytes coming from the kernel to the end of an
+ * sds string without copying into an intermediate buffer:
+ *
+ * oldlen = sdslen(s);
+ * s = sdsMakeRoomFor(s, BUFFER_SIZE);
+ * nread = read(fd, s+oldlen, BUFFER_SIZE);
+ * ... check for nread <= 0 and handle it ...
+ * sdsIncrLen(s, nread);
+ */
+void sdsIncrLen(sds s, int incr) {
+    struct sdshdr *sh = (struct sdshdr*) (s-(sizeof(struct sdshdr)));
+
+    if (incr >= 0)
+        assert(sh->free >= (unsigned int)incr);
+    else
+        assert(sh->len >= (unsigned int)(-incr));
+    sh->len += incr;
+    sh->free -= incr;
+    s[sh->len] = '\0';
+}
+
+/* Reallocate the sds string so that it has no free space at the end. The
+ * contained string remains not altered, but next concatenation operations
+ * will require a reallocation.
+ *
+ * After the call, the passed sds string is no longer valid and all the
+ * references must be substituted with the new pointer returned by the call. */
+sds sdsRemoveFreeSpace(sds s) {
+    struct sdshdr *sh;
+
+    sh = (struct sdshdr*) (s-(sizeof(struct sdshdr)));
+    sh = zrealloc(sh, sizeof(struct sdshdr)+sh->len+1);
+    sh->free = 0;
+    return sh->buf;
+}
+
+/* Return the total size of the allocation of the specifed sds string,
+ * including:
+ * 1) The sds header before the pointer.
+ * 2) The string.
+ * 3) The free buffer at the end if any.
+ * 4) The implicit null term.
+ */
+size_t sdsAllocSize(sds s) {
+    struct sdshdr *sh = (struct sdshdr*) (s-(sizeof(struct sdshdr)));
+
+    return sizeof(*sh)+sh->len+sh->free+1;
+}
+
+
 
 #ifdef SDS_TEST_MAIN
 #include<stdio.h>
@@ -1407,11 +1471,49 @@ int main()
         sds tmp = sdsjoin(tmparr,count,"@A@");
         test_cond_ext("sdsjon({...,3,\"@A@\") = sds from c string array \"foo@A@bar@A@zz\"",
             memcmp(tmp,"foo@A@bar@A@zz",15)==0)
-            printf("%s\n",tmp);
+        //printf("%s\n",tmp);
         sdsfree(tmp);
     }
     //}}}
     
+    // Low level functions exposed to the user API
+    {
+        int oldfree;
+
+        x = sdsnew("0");
+        struct sdshdr* sh = (struct sdshdr*) (x-(sizeof(struct sdshdr)));
+        test_cond_ext("sdsnew() free/len buffers", sh->len == 1 && sh->free == 0);
+        x = sdsMakeRoomFor(x,1);
+        sh = (struct sdshdr*) (x-(sizeof(struct sdshdr)));
+        test_cond_ext("sdsMakeRoomFor()", sh->len == 1 && sh->free > 0);
+        oldfree = sh->free;
+        x[1] = '1';
+        sdsIncrLen(x,1);
+        test_cond_ext("sdsIncrLen() -- content", x[0] == '0' && x[1] == '1');
+        test_cond_ext("sdsIncrLen() -- len", sh->len == 2);
+        test_cond_ext("sdsIncrLen() -- free", sh->free == oldfree-1);
+        sdsfree(x);
+
+        //{{{ sdsRemoveFreeSpace test
+        x = sdsnew("hello");
+        x = sdsRemoveFreeSpace(x);
+        sh = (struct sdshdr*) (x-(sizeof(struct sdshdr)));
+        test_cond_ext("sdsRemoveFreeSpace()",
+           sh->free == 0 && memcmp(x,"hello\0",6) == 0)
+        sdsfree(x);
+        //}}}
+
+        //{{{ sdsAllocSize test
+        x = sdsnew("hello");
+        size_t bytes = sdsAllocSize(x);
+        test_cond_ext("sdsAllocSize()",
+                (sizeof(int) == 4 && bytes==14) 
+                || (sizeof(int) == 8 && bytes==21)
+             )
+        sdsfree(x);
+        //}}}
+    }
+
     test_report_ext();
     return 0;
 }
