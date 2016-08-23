@@ -44,7 +44,7 @@ RUN locale-gen "zh_CN.UTF-8" && \
 
 VOLUME ["/data"]
 
-EXPOSE 22 6379
+EXPOSE 22 80 6379 
 
 CMD ["/usr/sbin/sshd", "-D"]
 
