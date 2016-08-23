@@ -1064,17 +1064,13 @@ return (sds)"";
 sds sdsjoin(char **argv, int argc, char *sep)
 {
     
-    size_t elemlen, //sds元素字符串长度
-           length=0,
-           seplen = strlen(sep); // c string
+    size_t seplen = strlen(sep); // c string
 
     //预分配空间
     sds tmp = sdsempty();
     for(int j=0;j<argc;j++){
-        elemlen = strlen(argv[j]);//c string
-        length += j==0?elemlen:seplen+elemlen;//sep只在中间的时候计算
-        if(j!=0)tmp = sdscatlen(tmp,sep,seplen);
-        tmp = sdscatlen(tmp,argv[j], length);
+        tmp = sdscat(tmp,argv[j]);
+        if(j!=argc-1)tmp = sdscatlen(tmp,sep,seplen);
     }
 
     return tmp;
@@ -1406,11 +1402,12 @@ int main()
     //{{{ sdsjoin test
     {
 
-        int count=2;
-        char *tmparr[]= {"foo","bar"};
+        int count=3;
+        char *tmparr[]= {"foo","bar","zz"};
         sds tmp = sdsjoin(tmparr,count,"@A@");
-        test_cond_ext("sdsjon({\"foo\",\"bar\"},2,\"@A@\") = sds from c string array \"foo@A@bar\"",
-            memcmp(tmp,"foo@A@bar",10)==0)
+        test_cond_ext("sdsjon({...,3,\"@A@\") = sds from c string array \"foo@A@bar@A@zz\"",
+            memcmp(tmp,"foo@A@bar@A@zz",15)==0)
+            printf("%s\n",tmp);
         sdsfree(tmp);
     }
     //}}}
