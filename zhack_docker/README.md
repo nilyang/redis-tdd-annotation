@@ -3,15 +3,31 @@
 
 ### 一、 镜像构建以及容器运行
 
+
+进入当前目录，运行以下命令来构建我们的镜像
+
 ```
 >  docker build -t "my:dev" .   
+>  docker images
+REPOSITORY                   TAG                 IMAGE ID            CREATED             SIZE
+my                           dev                 088fcbb618a6        1 seconds ago       795.8 MB
 ```
 
-为了检验是否ok，我们可以运行一条命令来看看
+说明：
+```
+REPOSITORY：镜像库名字
+TAG：       标签
+IMAGE ID：  镜像ID（唯一）
+CREATED：   构建时间
+SIZE：      镜像大小
+```
+
+这样，就得到了一个`repo`为 `my` 标记为 `dev` 的镜像，下面我们来使用这个镜像，小试牛刀：
 
 ```
 > docker run --rm  -v C:\Users:/data my:dev ls /data
 working
+...//其他文件夹和文件
 ```
 
 我们可以看到，上述命令列出了 `/data` 目录下的`working` 文件夹，实际上这个就是`D:\workspace`下的文件夹，说明一切Ok。
