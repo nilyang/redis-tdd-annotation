@@ -931,7 +931,8 @@ s-> +-----+-----+-----+
     }while(1);
 
     if(ifok == 0){
-        for(int i=0; i < index;i++){
+        int i;
+        for(i=0; i < index;i++){
             sdsfree(sdsarr[i]);
         }
         zfree(sdsarr);
@@ -1068,7 +1069,8 @@ sds sdsjoin(char **argv, int argc, char *sep)
 
     //预分配空间
     sds tmp = sdsempty();
-    for(int j=0;j<argc;j++){
+    int j;//c99 才支持在for里面初始化，为了兼容这里提出来声明
+    for(j=0;j<argc;j++){
         tmp = sdscat(tmp,argv[j]);
         if(j!=argc-1)tmp = sdscatlen(tmp,sep,seplen);
     }
