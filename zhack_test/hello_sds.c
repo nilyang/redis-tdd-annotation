@@ -863,7 +863,7 @@ s-> +-----+-----+-----+
     */
     //初始化变量
     sds *sdsarr, ps=(char *)s, pfind;
-    size_t tmplen;
+    size_t tmplen,restlen;
     int ifok = 1, slots=5, index=0;
     *count = 0;
 
@@ -874,7 +874,9 @@ s-> +-----+-----+-----+
         return sdsarr;
     }
 
-    do{
+    restlen = len;
+
+    do{        
         // 扩容,末尾要留给最后一个字符串
         if(slots < index+2){
             sds *tmparr;
@@ -885,12 +887,27 @@ s-> +-----+-----+-----+
             }
             sdsarr = tmparr;
         }
-
+        
         //find first position
-        pfind = strstr(ps, sep);
+        // pfind = strstr(ps, sep);//非二进制安全，需要替换
+        {
+            //二进制安全查找
+            int i=0;
+            int find=0;
+            for(;i<restlen;){
+                if(memcmp(ps+i, sep, seplen)==0){
+                    // printf("matched\n");
+                    find=1;
+                    break;
+                }
+                i+=1;
+            }
+            pfind = find ? ps+i : NULL;
+        }
+
         //这里可能是第一个或者最后一个
         if(pfind == NULL) {
-            sds tmp = sdsnewlen(ps, strlen(ps));
+            sds tmp = sdsnewlen(ps, restlen);
             if(tmp == NULL) {
                 ifok=0;
             }else{
@@ -909,6 +926,7 @@ s-> +-----+-----+-----+
 
         sdsarr[index] = tmp;
         ps += (tmplen+seplen);//移动指针到下一个位置（跳过sep)
+        restlen -= (tmplen+seplen);
         index++;
     }while(1);
 
@@ -1338,30 +1356,27 @@ int main()
 
     //{{{ sdssplitlen test
     {
-        const char * s = "foo_-zbar";
+        const char * s = "foo_-zb\0ar";
         const char * sep = "_-z";
         int count,j;
-        sds *tmparr = sdssplitlen(s, strlen(s), sep, strlen(sep),&count);
+        // sds *tmparr = sdssplitlen(s, strlen(s), sep, strlen(sep),&count);
+        sds *tmparr = sdssplitlen(s, 10, sep, 3,&count);
         if(tmparr){      
             // pstart[length] = '\0';
             // printf("%p,%c\n",tmp, *tmp);
             // if(tmp)zfree(tmp);
             char *tmp = (char*)malloc(sizeof(char)*80);
-            tmp[0] = '[';
-            tmp[1] = '\0';
             // tmp = ""; //这里不能通过字符串赋值方式来memcpy？为什么？会发生踩内存错误
             // memcpy(tmp+1, "123456789", 10);
-            size_t length = 1;
+            size_t length = 0;
             for(j=0;j<count;j++){
                 size_t lenx = sdslen(tmparr[j]);
                 //printf("len=%zu,item=%s\n", lenx,tmparr[j]);
                 memcpy(tmp+length, tmparr[j], lenx+1);
                 length += lenx;
             }
-            tmp[length]=']';
-            tmp[length+1] = '\0';
-            test_cond_ext("sdssplitlen('foo_-zbar',9,'_-z',3,&count)= foobar",
-                memcmp(tmp,"[foobar]",9) == 0)
+            test_cond_ext("sdssplitlen('foo_-zb\\0ar',10,'_-z',3,&count) -> binary safe [\"foo\",\"b\\0ar\"]",
+                memcmp(tmp,"foob\0ar",8) == 0)
             //printf("%s\n", tmp);
             if(tmp)zfree(tmp);
             for(j=0;j<count;j++)

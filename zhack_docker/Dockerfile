@@ -35,7 +35,8 @@ RUN echo 'admin:123456' | chpasswd
 RUN echo 'admin	ALL=(ALL)	NOPASSWD:ALL' >> /etc/sudoers
 
 # locale
-RUN echo "LANG=\"zh_CN.UTF-8\"" >> /etc/default/locale && \
+RUN locale-gen "zh_CN.UTF-8" && \
+    echo "LANG=\"zh_CN.UTF-8\"" >> /etc/default/locale && \
     echo "LANGUAGE=\"zh_CN:zh\"" >> /etc/default/locale
 
 #USER admin
