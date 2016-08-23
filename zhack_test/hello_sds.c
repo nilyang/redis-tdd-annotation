@@ -946,7 +946,11 @@ return sdsarr;
 /* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. */
 void sdsfreesplitres(sds *tokens, int count) 
 {
-
+    int i;
+    for(i=0; i<count;i++){
+        if(tokens[i])sdsfree(tokens[i]);
+    }
+    if(tokens)zfree(tokens);
 }
 
 /* Append to the sds string "s" an escaped string representation where
@@ -1059,7 +1063,21 @@ return (sds)"";
  * Returns the result as an sds string. */
 sds sdsjoin(char **argv, int argc, char *sep)
 {
-return (sds)"";
+    
+    size_t elemlen, //sds元素字符串长度
+           length=0,
+           seplen = strlen(sep); // c string
+
+    //预分配空间
+    sds tmp = sdsempty();
+    for(int j=0;j<argc;j++){
+        elemlen = strlen(argv[j]);//c string
+        length += j==0?elemlen:seplen+elemlen;//sep只在中间的时候计算
+        if(j!=0)tmp = sdscatlen(tmp,sep,seplen);
+        tmp = sdscatlen(tmp,argv[j], length);
+    }
+
+    return tmp;
 }
 
 
@@ -1375,17 +1393,27 @@ int main()
                 memcpy(tmp+length, tmparr[j], lenx+1);
                 length += lenx;
             }
-            test_cond_ext("sdssplitlen('foo_-zb\\0ar',10,'_-z',3,&count) -> binary safe [\"foo\",\"b\\0ar\"]",
+            test_cond_ext("sdssplitlen('foo_-zb\\0ar',10,'_-z',3,&count) -> binary safe {\"foo\",\"b\\0ar\"}",
                 memcmp(tmp,"foob\0ar",8) == 0)
             //printf("%s\n", tmp);
             if(tmp)zfree(tmp);
-            for(j=0;j<count;j++)
-                sdsfree(tmparr[j]);
-            if(tmparr) zfree(tmparr);
+        
+            sdsfreesplitres(tmparr,count);
         }
     }
     //}}}
 
+    //{{{ sdsjoin test
+    {
+
+        int count=2;
+        char *tmparr[]= {"foo","bar"};
+        sds tmp = sdsjoin(tmparr,count,"@A@");
+        test_cond_ext("sdsjon({\"foo\",\"bar\"},2,\"@A@\") = sds from c string array \"foo@A@bar\"",
+            memcmp(tmp,"foo@A@bar",10)==0)
+        sdsfree(tmp);
+    }
+    //}}}
     
     test_report_ext();
     return 0;
