@@ -954,7 +954,10 @@ void sdsfreesplitres(sds *tokens, int count)
     if(tokens)zfree(tokens);
 }
 
-/* Append to the sds string "s" an escaped string representation where
+
+/* 将字符串 s 里面的特殊字符转义显示出来，并用双引号""括起来
+ *
+ * Append to the sds string "s" an escaped string representation where
  * all the non-printable characters (tested with isprint()) are turned into
  * escapes in the form "\n\r\a...." or "\x<hex-number>".
  *
@@ -962,7 +965,32 @@ void sdsfreesplitres(sds *tokens, int count)
  * references must be substituted with the new pointer returned by the call. */
 sds sdscatrepr(sds s, const char *p, size_t len) 
 {
-return (sds)"";
+    s = sdscatlen(s,"\"",1);
+
+    while(len--){
+        switch(*p){
+            case '\\':
+            case '"':
+                s = sdscatprintf(s,"\\%c",*p);
+                break;
+            case '\n': s = sdscatlen(s, "\\n", 2);break;
+            case '\r': s = sdscatlen(s, "\\r", 2);break;
+            case '\t': s = sdscatlen(s, "\\t", 2);break;
+            case '\a': s = sdscatlen(s, "\\a", 2);break;
+            case '\b': s = sdscatlen(s, "\\b", 2);break;
+            default:
+                if(isprint(*p)){
+                    s = sdscatprintf(s, "%c",*p);
+                }else{
+                    s = sdscatprintf(s, "\\x%02x",(unsigned char)*p);
+                }
+                break;
+        }
+
+        p++;
+    }
+
+    return sdscatlen(s,"\"",1);
 }
 
 /**
@@ -1434,7 +1462,7 @@ int main()
 
     //}}}
 
-    //{{{ sdssplitlen test
+    //{{{ sdssplitlen/sdsfreesplitres test
     {
         const char * s = "foo_-zb\0ar";
         const char * sep = "_-z";
@@ -1463,6 +1491,18 @@ int main()
             sdsfreesplitres(tmparr,count);
         }
     }
+    //}}}
+
+
+    //{{{ sdscatrepr() test
+    x = sdsnewlen("\a\n\0foo\r",7);
+    y = sdscatrepr(sdsempty(),x,sdslen(x));
+    printf("%s\n",y);
+    test_cond_ext("sdscatrepr(...data...)",
+        memcmp(y,"\"\\a\\n\\x00foo\\r\"",15) == 0)
+
+    sdsfree(x);
+    sdsfree(y);
     //}}}
 
     //{{{ sdsjoin test
@@ -1515,6 +1555,7 @@ int main()
         sdsfree(x);
         //}}}
     }
+
 
     test_report_ext();
     return 0;
