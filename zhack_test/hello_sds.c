@@ -994,24 +994,50 @@ sds sdscatrepr(sds s, const char *p, size_t len)
 }
 
 /**
+ * 测试字符是否为十六进制字符
  * Helper function for sdssplitargs() that returns non zero if 'c'
  * is a valid hex digit. 
  */
 int is_hex_digit(char c) 
 {
-return 0;
+    return (c <='f' && c >='a')|| (c <='F' && c >='A') || (c >= '0' && c <= '9');
 }
 
 
 /**
+ * 转换十六进制符号位数字
  * Helper function for sdssplitargs() that converts a hex digit into an
  * integer from 0 to 15 
  */
 int hex_digit_to_int(char c) 
 {
-return 0;
+    int num;
+    if(c <= '9' && c >= '0')  num = c - '0';
+    else
+        switch(c){
+            case 'a':
+            case 'A':
+                num = 10;break;
+            case 'b':
+            case 'B':
+                num = 11;break;
+            case 'c':
+            case 'C':
+                num = 12;break;
+            case 'd':
+            case 'D':
+                num = 13;break;
+            case 'e':
+            case 'E':
+                num = 14;break;
+            case 'f':
+            case 'F':
+                num = 15;break;
+            default:
+                num = 0;//fail
+        }
+     return num;
 }
-
 
 
 /* Split a line into arguments, where every argument can be in the
@@ -1497,8 +1523,8 @@ int main()
     //{{{ sdscatrepr() test
     x = sdsnewlen("\a\n\0foo\r",7);
     y = sdscatrepr(sdsempty(),x,sdslen(x));
-    printf("%s\n",y);
-    test_cond_ext("sdscatrepr(...data...)",
+    // printf("%s\n",y);
+    test_cond_ext("sdscatrepr(...data...) -> \"\\a\\n\\x00foo\\r\" ",
         memcmp(y,"\"\\a\\n\\x00foo\\r\"",15) == 0)
 
     sdsfree(x);
@@ -1511,13 +1537,22 @@ int main()
         int count=3;
         char *tmparr[]= {"foo","bar","zz"};
         sds tmp = sdsjoin(tmparr,count,"@A@");
-        test_cond_ext("sdsjon({...,3,\"@A@\") = sds from c string array \"foo@A@bar@A@zz\"",
+        test_cond_ext("sdsjon({\"foo\",\"bar\",\"zz\"},3,\"@A@\") -> join c string array \"foo@A@bar@A@zz\"",
             memcmp(tmp,"foo@A@bar@A@zz",15)==0)
         //printf("%s\n",tmp);
         sdsfree(tmp);
     }
     //}}}
-    
+
+    //{{{ is_hex_digit/hex_digit_to_int test
+    test_cond_ext("is_hex_digit('2') == 1",is_hex_digit('2')==1)
+    test_cond_ext("is_hex_digit('e') == 1",is_hex_digit('e')==1)
+    test_cond_ext("is_hex_digit('g') == 0",is_hex_digit('g')==0)
+    test_cond_ext("hex_digit_to_int('2') == 2",hex_digit_to_int('2') == 2)
+    test_cond_ext("hex_digit_to_int('F') == 15",hex_digit_to_int('F') == 15)
+    test_cond_ext("hex_digit_to_int('f') == 15",hex_digit_to_int('f') == 15)
+    //}}}
+
     // Low level functions exposed to the user API
     {
         int oldfree;
