@@ -1039,41 +1039,33 @@ int hex_digit_to_int(char c)
      return num;
 }
 
-
-/* Split a line into arguments, where every argument can be in the
- * following programming-language REPL-alike form:
+/**
+ *  将字符串行，分解为若干个参数数组，每个参数遵循如下类似REPL形式
+ *    
+ *   foo bar "newline are supported\n" and "\xff\x00otherstuff"
+ *   
+ *   其中，REPL即（Read-Eval-Print-Loop），参考python交互式命令行。  
  *
- * 将一行文本分割成多个参数，每个参数可以有以下的类编程语言 REPL 格式：
+ *   //对上述字符串进行分割，结果如下：
+ *   //0xff / 0x00 这种16进制数算1个字符
+ *   int count=0;
+ *   sds *arr <-- sdssplitargs(...,&count);
+ *   arr[0] --> "foo";
+ *   arr[1] --> "bar";
+ *   arr[2] --> "newline are supported\n";
+ *   arr[3] --> "and";
+ *   arr[4] --> "\xff\x00otherstuff";
  *
- * foo bar "newline are supported\n" and "\xff\x00otherstuff"
- *
- * The number of arguments is stored into *argc, and an array
- * of sds is returned.
- *
+ * ============黄健宏注释===============
  * 参数的个数会保存在 *argc 中，函数返回一个 sds 数组。
- *
- * The caller should free the resulting array of sds strings with
- * sdsfreesplitres().
- *
  * 调用者应该使用 sdsfreesplitres() 来释放函数返回的 sds 数组。
- *
- * Note that sdscatrepr() is able to convert back a string into
- * a quoted string in the same format sdssplitargs() is able to parse.
- *
  * sdscatrepr() 可以将一个字符串转换为一个带引号（quoted）的字符串，
  * 这个带引号的字符串可以被 sdssplitargs() 分析。
- *
- * The function returns the allocated tokens on success, even when the
- * input string is empty, or NULL if the input contains unbalanced
- * quotes or closed quotes followed by non space characters
- * as in: "foo"bar or "foo'
- *
  * 即使输入出现空字符串， NULL ，或者输入带有未对应的括号，
  * 函数都会将已成功处理的字符串先返回。
- *
  * 这个函数主要用于 config.c 中对配置文件进行分析。
  * 例子：
- *  sds *arr = sdssplitargs("timeout 10086\r\nport 123321\r\n");
+ * sds *arr = sdssplitargs("timeout 10086\r\nport 123321\r\n");
  * 会得出
  *  arr[0] = "timeout"
  *  arr[1] = "10086"
@@ -1081,12 +1073,135 @@ int hex_digit_to_int(char c)
  *  arr[3] = "123321"
  *
  * T = O(N^2)
+ * ============黄健宏注释===============
+ * Split a line into arguments, where every argument can be in the
+ * following programming-language REPL-alike form:
+ * 
+ * foo bar "newline are supported\n" and "\xff\x00otherstuff"
+ *
+ * The number of arguments is stored into *argc, and an array
+ * of sds is returned.
+ *
+ * The caller should free the resulting array of sds strings with
+ * sdsfreesplitres().
+ *
+ * Note that sdscatrepr() is able to convert back a string into
+ * a quoted string in the same format sdssplitargs() is able to parse.
+ *
+ * The function returns the allocated tokens on success, even when the
+ * input string is empty, or NULL if the input contains unbalanced
+ * quotes or closed quotes followed by non space characters
+ * as in: "foo"bar or "foo'
  */
-sds *sdssplitargs(const char *line, int *argc) 
-{
-return (sds *)"";
-}
+sds *sdssplitargs(const char *line, int *argc) {
+    const char *p = line;
+    char *current = NULL;
+    char **vector = NULL;
 
+    *argc = 0;
+    while(1) {
+        /* skip blanks */
+        while(*p && isspace(*p)) p++;
+        if (*p) {
+            /* get a token */
+            int inq=0;  /* set to 1 if we are in "quotes" */
+            int insq=0; /* set to 1 if we are in 'single quotes' */
+            int done=0;
+
+            if (current == NULL) current = sdsempty();
+            while(!done) {
+                if (inq) {
+                    if (*p == '\\' && *(p+1) == 'x' &&
+                                             is_hex_digit(*(p+2)) &&
+                                             is_hex_digit(*(p+3)))
+                    {
+                        unsigned char bytex;
+
+                        bytex = (hex_digit_to_int(*(p+2))*16)+
+                                hex_digit_to_int(*(p+3));
+                        current = sdscatlen(current,(char*)&bytex,1);
+                        p += 3;
+                    } else if (*p == '\\' && *(p+1)) {
+                        char c;
+
+                        p++;
+                        switch(*p) {
+                        case 'n': c = '\n'; break;
+                        case 'r': c = '\r'; break;
+                        case 't': c = '\t'; break;
+                        case 'b': c = '\b'; break;
+                        case 'a': c = '\a'; break;
+                        default: c = *p; break;//还原普通字符 '\xfx' --> 'xfx'
+                        }
+                        current = sdscatlen(current,&c,1);
+                    } else if (*p == '"') {
+                        /* closing quote must be followed by a space or
+                         * nothing at all. */
+                        if (*(p+1) && !isspace(*(p+1))) goto err;
+                        done=1;
+                    } else if (!*p) {
+                        /* unterminated quotes */
+                        goto err;
+                    } else {
+                        current = sdscatlen(current,p,1);
+                    }
+                } else if (insq) {
+                    if (*p == '\\' && *(p+1) == '\'') {
+                        p++;
+                        current = sdscatlen(current,"'",1);
+                    } else if (*p == '\'') {
+                        /* closing quote must be followed by a space or
+                         * nothing at all. */
+                        if (*(p+1) && !isspace(*(p+1))) goto err;
+                        done=1;
+                    } else if (!*p) {
+                        /* unterminated quotes */
+                        goto err;
+                    } else {
+                        current = sdscatlen(current,p,1);
+                    }
+                } else {
+                    switch(*p) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                    case '\0':
+                        done=1;
+                        break;
+                    case '"':
+                        inq=1;
+                        break;
+                    case '\'':
+                        insq=1;
+                        break;
+                    default:
+                        current = sdscatlen(current,p,1);
+                        break;
+                    }
+                }
+                if (*p) p++;
+            }
+            /* add the token to the vector */
+            vector = zrealloc(vector,((*argc)+1)*sizeof(char*));
+            vector[*argc] = current;
+            (*argc)++;
+            current = NULL;
+        } else {
+            /* Even on empty input string return something not NULL. */
+            if (vector == NULL) vector = zmalloc(sizeof(void*));
+            return vector;
+        }
+    }
+
+err:
+    while((*argc)--)
+        sdsfree(vector[*argc]);
+    zfree(vector);
+    if (current) sdsfree(current);
+    *argc = 0;
+    return NULL;
+}
 
 /* Modify the string substituting all the occurrences of the set of
  * characters specified in the 'from' string to the corresponding character
@@ -1279,7 +1394,36 @@ size_t sdsAllocSize(sds s) {
 #include<stdio.h>
 #include<limits.h>
 #include"testhelp_ext.h"
+sds sdstrim2(sds s, const char *cset) {
+    struct sdshdr *sh = (void*) (s-(sizeof(struct sdshdr)));
+    char *start, *end, *sp, *ep;
+    size_t len;
 
+    // 设置和记录指针
+    sp = start = s;
+    ep = end = s+sdslen(s)-1;
+
+    // 修剪, T = O(N^2)
+    while(sp <= end && strchr(cset, *sp)) sp++;
+    while(ep > start && strchr(cset, *ep)) ep--;
+
+    // 计算 trim 完毕之后剩余的字符串长度
+    len = (sp > ep) ? 0 : ((ep-sp)+1);
+    
+    // 如果有需要，前移字符串内容
+    // T = O(N)
+    if (sh->buf != sp) memmove(sh->buf, sp, len);
+
+    // 添加终结符
+    sh->buf[len] = '\0';
+
+    // 更新属性
+    sh->free = sh->free+(sh->len-len);
+    sh->len = len;
+
+    // 返回修剪后的 sds
+    return s;
+}
 int main()
 {
     printf("\n");
@@ -1553,6 +1697,33 @@ int main()
     test_cond_ext("hex_digit_to_int('f') == 15",hex_digit_to_int('f') == 15)
     //}}}
 
+    //{{{
+    {
+        int count = 0;
+        sds *arr = sdssplitargs("foo bar \"newline are supported\\n\" and \"\\xff\\x00otherstuff\"", &count);
+        
+        // printf("arr=%p,count=%d\n",arr,count);
+        // int j;
+        // for(j=0;j<count;j++){
+        //     struct sdshdr *sh = (struct sdshdr*)(arr[j] - sizeof(struct sdshdr));
+        //     printf("len=%u,free=%u,sdslen=%zu,buf=%s\n", sh->len,sh->free,
+        //          sdslen(sh->buf),sdscatrepr(sdsempty(),sh->buf,sh->len));
+        // }
+        //0xff / 0x00 这种16进制数算1个字符
+        test_cond_ext("sdssplitargs(..data.., &count) split line to REPL sds string array",
+            count == 5
+           && memcmp(sdsbuf(arr[0]),"foo\0",4) == 0 
+           && memcmp(sdsbuf(arr[1]),"bar\0",4) == 0 
+           && memcmp(sdsbuf(arr[2]),"newline are supported\n\0", 23) == 0
+           && memcmp(sdsbuf(arr[3]),"and\0", 4) == 0
+           && memcmp(sdsbuf(arr[4]),"\xff\x00otherstuff\0", 13) ==0
+           );
+
+        sdsfreesplitres(arr, count);
+        
+    }
+    
+    //}}}
     // Low level functions exposed to the user API
     {
         int oldfree;
