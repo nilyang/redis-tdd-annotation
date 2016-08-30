@@ -58,10 +58,24 @@ void test_byte_copy()
 
 }
 
+// 常见内存操作错误示例
+void test_memery_err()
+{
+    char *s = "hello";
+    printf("%s\n",s);
+    // *s = '9'; //Segmentation fault
+    //原因： 由于C语言在分配给"hello"常量字符串的空间的时候，是分配到静态只读数据段
+    //  即 "hello" 存储在 .rodata 段，此段数据是不可写的，所有试图对该数据段进行修改的操作统统驳回
+    // 如果需要对 s 进行修改，必须在非只读数据段进，即需要给s分配动态内存空间(堆)
+    s = malloc(sizeof(char)*5);
+    s = memcpy(s,"aello",6);//包含结束字符
+    printf("%s\n",s);
+}
 
 int main()
 {
     // test_endin();
-    test_byte_copy();
+    // test_byte_copy();
+    test_memery_err();
     return 0;
 }
