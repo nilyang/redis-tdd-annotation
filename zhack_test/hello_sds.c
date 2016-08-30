@@ -1116,9 +1116,11 @@ sds *sdssplitargs(const char *line, int *argc) {
                                              is_hex_digit(*(p+3)))
                     {
                         unsigned char bytex;
-
+                        // 将hex字符串转换为整数（0 <= bytex <= 256）
+                        // 刚好一个字节，sdscatlen 拷贝的时候，只需拷贝1个字节的数据
                         bytex = (hex_digit_to_int(*(p+2))*16)+
                                 hex_digit_to_int(*(p+3));
+                        // char* 按字节读取数据，参考测试 zhack_c/show_byte.c
                         current = sdscatlen(current,(char*)&bytex,1);
                         p += 3;
                     } else if (*p == '\\' && *(p+1)) {

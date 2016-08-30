@@ -1,8 +1,10 @@
 #include"byte_printer.h"
+#include<string.h>
+#include<stdlib.h>
+
 
 //机器大小端实验
-
-int main()
+void test_endin()
 {
     int x = 12345;
     show_int(x);
@@ -26,6 +28,40 @@ int main()
     show_int(y);
     // d2 04 00 00
     // 0x7fff9574849c 0x7fff9574849d 0x7fff9574849e 0x7fff9574849f
+}
 
+// 按字节拷贝实验
+void test_byte_copy()
+{
+    unsigned char z=97;
+    
+    // 栈空间
+    char *s  = "hello";
+    // 堆空间
+    char *ps = (char*)malloc(sizeof(char)*5+1);
+    printf("%s\n",s);
+    
+    printf("97-->0x%.2x\n", ((unsigned char*)&z)[0]);
+    show_int(z);
+
+    memcpy(ps, s, strlen(s));
+    ps = realloc(ps, strlen(s)+5);
+    // 将1个字节拷贝到ps字符串之后
+    memcpy(ps+5, (char *)&z, 1);
+    
+    ps[6]='\0';//字符串结束符，必须的，否则没法使用strlen等字符串操作函数
+
+    printf("ps=%s, len=%zu\n", ps, strlen(ps));
+    //ps=helloA,len=6
+
+    free(ps);
+
+}
+
+
+int main()
+{
+    // test_endin();
+    test_byte_copy();
     return 0;
 }
