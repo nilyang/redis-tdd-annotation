@@ -1227,7 +1227,24 @@ err:
  */
 sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen) 
 {
-return (sds)"";
+    //边界检查
+    // if (!s) return NULL;
+    // if (!from || !to) return s;
+    // if(setlen<1) return s;
+    // if(strlen(from) < setlen|| strlen(to)<setlen) return s;
+
+    size_t i,j, len = sdslen(s);
+
+    for(i=0; i<len; i++){
+        for(j=0;j<setlen;j++){
+            if(from[j]==s[i]){
+                s[i] = to[j];
+                break;
+            }
+        }
+    }
+
+    return s;
 }
 
 
@@ -1725,6 +1742,13 @@ int main()
         
     }
     
+    // sdsmapchars() test
+    x = sdsnew("hello");
+    x = sdsmapchars(x, "he", "01", 2);
+    // printf("%s\n",x);
+    test_cond_ext("sdsmapchars(\"hello\",\"he\",\"01\",2) = \"0ell1\"",
+        memcmp(x,"0ell1\0",6))
+    sdsfree(x);
     //}}}
     // Low level functions exposed to the user API
     {
