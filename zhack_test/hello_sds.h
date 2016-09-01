@@ -2,16 +2,7 @@
 #ifndef __SDS_H
 #define __SDS_H
 
-#ifndef ZMALLOC_H
-#define ZMALLOC_H
-
-#define zmalloc malloc
-#define zrealloc realloc
-#define zcalloc(x) calloc(x,1)
-#define zfree free
-#define zstrdup strdup
-
-#endif
+#include"hello_zmalloc.h"
 /*
  * 最大预分配长度
  */
