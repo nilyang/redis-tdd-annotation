@@ -97,7 +97,8 @@ list *listAddNodeHead(list *list, void *value)
 // void listRewindTail(list *list, listIter *li);
 // void listRotate(list *list);
 
-
+// gcc -D ADLIST_TEST_MAIN  -Wall  -ggdb hello_adlist.c -o adlist
+// valgrind --vgdb=yes --leak-check=full --track-origins=yes ./adlist
 #ifdef ADLIST_TEST_MAIN
 #include<stdio.h>
 #include<limits.h>
