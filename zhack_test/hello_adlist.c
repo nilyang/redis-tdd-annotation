@@ -194,9 +194,71 @@ void listDelNode(list *list, listNode *node)
     // 节点数减一
     list->len--;
 }
-// listIter *listGetIterator(list *list, int direction);
-// listNode *listNext(listIter *iter);
-// void listReleaseIterator(listIter *iter);
+
+/**
+ * 链表遍历迭代器初始化工具，返回迭代器iter， direction表示遍历方向，0：正向遍历，1：反向遍历
+ * 注：被 listNext() 调用时，用于返回下一个元素，不可失败！
+ * Returns a list iterator 'iter'. After the initialization every
+ * call to listNext() will return the next element of the list.
+ *
+ * This function can't fail
+ */
+listIter *listGetIterator(list *list, int direction)
+{
+    listIter *iter = (listIter*)zmalloc(sizeof(listIter));
+    if (iter == NULL) return NULL;
+
+    iter->next = direction == AL_START_HEAD ? list->head:list->tail;
+    iter->direction = direction;
+    return iter;
+}
+
+/**
+ * 通过迭代器，迭代返回下一个元素
+ *
+ *
+ * Return the next element of an iterator.
+ * It's valid to remove the currently returned element using
+ * listDelNode(), but not to remove other elements.
+ *
+ * The function returns a pointer to the next element of the list,
+ * or NULL if there are no more elements, so the classical usage patter
+ * is:
+ *
+ * iter = listGetIterator(list,<direction>);
+ * while ((node = listNext(iter)) != NULL) {
+ *     doSomethingWith(listNodeValue(node));
+ * }
+ *
+ */
+listNode *listNext(listIter *iter)
+{
+    if (iter == NULL) return NULL;
+
+    listNode *node;
+
+    node = iter->next;
+
+    if (node == NULL) return NULL;
+
+    if (iter->direction == AL_START_HEAD) {
+        iter->next = node->next;
+    } else {
+        iter->next = node->prev;
+    }
+    return node;
+}
+
+
+/**
+ * 释放迭代器指针
+ */
+void listReleaseIterator(listIter *iter)
+{
+    if (iter == NULL) return;
+    zfree(iter);
+}
+
 // list *listDup(list *orig);
 // listNode *listSearchKey(list *list, void *key);
 // listNode *listIndex(list *list, long index);
