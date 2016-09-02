@@ -98,7 +98,7 @@ list *listAddNodeHead(list *list, void *value)
  * On success the 'list' pointer you pass to the function is returned. */
 list *listAddNodeTail(list *list, void *value)
 {
-    listNode *node = (listNode*)malloc(sizeof(listNode));
+    listNode *node = (listNode*)zmalloc(sizeof(listNode));
     if(node==NULL) return NULL;
 
     node->value = value;
@@ -118,7 +118,49 @@ list *listAddNodeTail(list *list, void *value)
 
     return list;
 }
-// list *listInsertNode(list *list, listNode *old_node, void *value, int after);
+
+/**
+ * 从给定链表元素后面或前面插新结点
+ */
+list *listInsertNode(list *list, listNode *old_node, void *value, int after)
+{
+    listNode *node;
+    if((node=(listNode*)zmalloc(sizeof(listNode))) == NULL)
+        return NULL;
+    //0. value赋值
+    node->value = value;
+
+    //1. 首先将结点插入到链表中
+    if (after) {
+        //在结点old_node后面插入
+        node->prev = old_node;
+        node->next = old_node->next;
+        if (list->tail == old_node) {
+            list->tail = node;
+        }
+    } else {
+        //在结点old_node前面插入
+        node->next = old_node;
+        node->prev = old_node->prev;
+        if (list->head == old_node) {
+            list->head = node;
+        }
+    }
+
+    //2. 然后将结点前后的双向链接打通
+    if (node->prev != NULL) {
+        node->prev->next = node;//让前置结点的next指向当前结点
+    }
+    if (node->next != NULL) {
+        node->next->prev = node;//让后置结点的prev指向当前结点
+    }
+
+    list->len++;
+
+    return list;
+}
+
+
 // void listDelNode(list *list, listNode *node);
 // listIter *listGetIterator(list *list, int direction);
 // listNode *listNext(listIter *iter);
@@ -183,6 +225,26 @@ int main()
         && pList->tail == pList->head 
         && pList->len == 1)
     listRelease(pList);
+
+    //5. listInsertNode test
+    pList = listCreate();
+    pList->free = sdsfree_wrapper;
+    pList = listAddNodeHead(pList,sdsnew("Hello"));
+    pList = listAddNodeTail(pList,sdsnew("world"));
+    //在节点后面插入"goodbyte"
+    pList = listInsertNode(pList,pList->head,sdsnew("goodbyte"), 1);
+    test_cond_ext("listInsertNode() test insert node after head",
+        pList->len==3 
+        && memcmp(pList->head->next->value,"goodbyte\0", 9) == 0
+        && memcmp(pList->tail->prev->value,"goodbyte\0", 9) == 0)
+    //在head前面插入结点
+    pList = listInsertNode(pList,pList->head,sdsnew("begin"), 0);
+    test_cond_ext("listInsertNode() test insert node before head",
+        pList->len == 4
+        && memcmp(pList->head->value,"begin\0", 6) ==0
+        && memcmp(pList->head->next->value,"Hello\0", 6) ==0 )
+    listRelease(pList);
+
     return 0;
 }
 #endif
