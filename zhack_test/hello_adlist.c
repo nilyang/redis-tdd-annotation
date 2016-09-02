@@ -161,7 +161,39 @@ list *listInsertNode(list *list, listNode *old_node, void *value, int after)
 }
 
 
-// void listDelNode(list *list, listNode *node);
+/* 
+ * 删除指定节点
+ *
+ * Remove the specified node from the specified list.
+ * It's up to the caller to free the private value of the node.
+ *
+ * This function can't fail. 
+ */
+void listDelNode(list *list, listNode *node)
+{
+    // 如何报错？
+    if (list==NULL || list->head == NULL || node == NULL)
+        return;
+
+    // 剪掉node在链中和其他节点的关联
+
+    // 处理前置节点的next字段
+    if (node->prev)
+        node->prev->next = node->next;
+    else
+        list->head = node->next;
+    // 处理后置节点的prev字段
+    if (node->next)
+        node->next->prev = node->prev;
+    else
+        list->tail = node->prev;
+    
+    // 释放资源
+    if (list->free) list->free(node->value);
+    zfree(node);
+    // 节点数减一
+    list->len--;
+}
 // listIter *listGetIterator(list *list, int direction);
 // listNode *listNext(listIter *iter);
 // void listReleaseIterator(listIter *iter);
@@ -247,6 +279,24 @@ int main()
         && pList->tail->next == NULL
         && memcmp(pList->head->value,"begin\0", 6) ==0
         && memcmp(pList->head->next->value,"Hello\0", 6) ==0 )
+
+    //6. listDelNode test
+    //删除节点测试
+    listDelNode(pList,pList->head);
+    test_cond_ext("listDelNode() test del head",
+        pList->len == 3
+        && pList->head->prev == NULL
+        && memcmp(pList->head->value,"Hello\0", 6) ==0 )
+
+    //三次删除
+    listDelNode(pList,pList->head);
+    listDelNode(pList,pList->head);
+    listDelNode(pList,pList->tail);
+
+    test_cond_ext("listDelNode() test del all heads one by one",
+        pList->len == 0
+        && pList->head == pList->tail 
+        && pList->head == NULL)
     listRelease(pList);
 
     return 0;
