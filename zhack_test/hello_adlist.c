@@ -235,12 +235,16 @@ int main()
     pList = listInsertNode(pList,pList->head,sdsnew("goodbyte"), 1);
     test_cond_ext("listInsertNode() test insert node after head",
         pList->len==3 
+        && pList->head->prev == NULL
+        && pList->tail->next == NULL
         && memcmp(pList->head->next->value,"goodbyte\0", 9) == 0
         && memcmp(pList->tail->prev->value,"goodbyte\0", 9) == 0)
     //在head前面插入结点
     pList = listInsertNode(pList,pList->head,sdsnew("begin"), 0);
     test_cond_ext("listInsertNode() test insert node before head",
         pList->len == 4
+        && pList->head->prev == NULL
+        && pList->tail->next == NULL
         && memcmp(pList->head->value,"begin\0", 6) ==0
         && memcmp(pList->head->next->value,"Hello\0", 6) ==0 )
     listRelease(pList);
