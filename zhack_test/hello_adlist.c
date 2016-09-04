@@ -259,8 +259,104 @@ void listReleaseIterator(listIter *iter)
     zfree(iter);
 }
 
-// list *listDup(list *orig);
-// listNode *listSearchKey(list *list, void *key);
+/* 
+ * 复制整个链表, 内存不足时返回 NULL，成功饭返回副本。
+ * 
+ * 如果链表结构的 `dup` （list->dup）函数设置了拷贝函数(. listSetDupMethod(m) ，则使用拷贝函数复制结点值。
+ * 否则，新节点和原结点共同使用同一指针。
+ * 
+ * 无论结果成功或失败，都不修改原来的链表。
+ *
+ * Duplicate the whole list. On out of memory NULL is returned.
+ * On success a copy of the original list is returned.
+ *
+ * The 'Dup' method set with listSetDupMethod() function is used
+ * to copy the node value. Otherwise the same pointer value of
+ * the original node is used as value of the copied node.
+ *
+ * The original list both on success or error is never modified. */
+list *listDup(list *orig)
+{
+    list *copy;
+    listIter *iter;
+    listNode *node;
+    copy = listCreate();
+    if (copy == NULL) return NULL;
+
+    copy->dup = orig->dup;
+    copy->free = orig->free;
+    copy->match = orig->match;
+    
+    iter = listGetIterator(orig, AL_START_HEAD);
+    while((node = listNext(iter)) != NULL) {
+        void *value;
+        if (copy->dup) {
+            value = copy->dup(node->value);
+            // 拷贝失败，返回 NULL
+            if (value == NULL) {
+                listRelease(copy);
+                listReleaseIterator(iter);
+                return NULL;
+            }
+        } else {
+            //没有 指定拷贝函数，则共享数据指针
+            value = node->value;
+        }
+
+        //添加结点到链表尾部
+        if (listAddNodeTail(copy, value) == NULL){
+            listRelease(copy);
+            listReleaseIterator(iter);
+            return NULL;
+        }
+    }
+
+    listReleaseIterator(iter);
+
+    return copy;
+}
+
+/**
+ * 链表的查找函数，在链表的节点中查找含有给定key值的结点。
+ * 匹配算法使用'list->match'函数（如果设置了match函数的话）。
+ * 如果没有指定'match'函数，则所有结点的比较都使用`value`指针来和key指针比较
+ * 
+ * 如果成功，返回第一个匹配节点的指针，否则返回NULL。
+ *
+ * Search the list for a node matching a given key.
+ * The match is performed using the 'match' method
+ * set with listSetMatchMethod(). If no 'match' method
+ * is set, the 'value' pointer of every node is directly
+ * compared with the 'key' pointer.
+ *
+ * On success the first matching node pointer is returned
+ * (search starts from head). If no matching node exists
+ * NULL is returned.
+ */
+listNode *listSearchKey(list *list, void *key)
+{
+    listNode *node;
+    listIter *iter = listGetIterator(list,AL_START_HEAD);
+    if (iter == NULL) return NULL;
+
+    while((node = listNext(iter)) != NULL) {
+        // 使用 match 自定义比较函数来判断
+        if (list->match && list->match(node->value, key) == 0) {
+            // printf("Find-1->%s\n", (char *)node->value);
+            break;
+        } else if(node->value == key) {
+            // printf("Find-2->%s\n", (char *)node->value);
+            break;
+        } 
+        // else{
+        //     printf("not found\n");
+        // }
+    }
+
+    listReleaseIterator(iter);
+
+    return node;
+}
 // listNode *listIndex(list *list, long index);
 // void listRewind(list *list, listIter *li);
 // void listRewindTail(list *list, listIter *li);
@@ -280,6 +376,12 @@ int sdsfree_wrapper(void *value)
     sdsfree((sds)value);
     return 1;
 }
+
+void* sdsdup_wapper(void *ptr)
+{
+    return sdsdup((const sds)ptr);
+}
+
 
 int main()
 {
@@ -361,6 +463,42 @@ int main()
         && pList->head == NULL)
     listRelease(pList);
 
+    //7. listDup() test
+    pList = listCreate();
+    pList->free = sdsfree_wrapper;
+    pList->dup = sdsdup_wapper;
+    pList = listAddNodeHead(pList,sdsnew("Hello"));
+    pList = listAddNodeTail(pList,sdsnew("world"));
+    pList = listInsertNode(pList,pList->head,sdsnew("goodbyte"), 1);
+    list *pList2 = listDup(pList);
+    test_cond_ext("listDup() test",
+        pList->len == pList2->len 
+        && pList != pList2
+        && pList->match == pList2->match
+        && pList->dup == pList2->dup
+        && pList->free == pList2->free
+        && pList->match == pList2->match
+        && memcmp(pList2->head->next->value, "goodbyte\0", 9) == 0
+        && memcmp(pList2->head->value, "Hello\0", 6) == 0
+        && memcmp(pList2->tail->value, "world\0", 6) == 0
+        )
+    // printf("%s\n", (char*)pList2->head->next->value);
+    // 8. listSearchKey(list, key) test
+    {
+        printf("%s,%s,%s\n",
+             (char*) pList->head->value
+            ,(char*) pList->head->next->value
+            ,(char*) pList->head->next->next->value
+            );
+        
+        listNode* key = pList->head->next;
+
+        listNode* node = listSearchKey(pList, key->value);
+        if(node)
+            printf("%s,%s\n",(char*) key->value, (char*)node->value);
+    }
+    listRelease(pList);
+    listRelease(pList2);
     return 0;
 }
 #endif
