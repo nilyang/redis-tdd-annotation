@@ -391,12 +391,43 @@ listNode *listIndex(list *list, long index)
     return node;
 }
 
+/*
+ * 重置迭代器方向，顺序，从头部开始
+ * Create an iterator in the list private iterator structure
+ */
 void listRewind(list *list, listIter *li)
 {
-
+    li->next = list->head;
+    li->direction = AL_START_HEAD;
 }
-// void listRewindTail(list *list, listIter *li);
-// void listRotate(list *list);
+
+/*
+ * 重置迭代器方向，倒序，从尾部开始
+ */
+void listRewindTail(list *list, listIter *li)
+{
+    li->next = list->tail;
+    li->direction = AL_START_TAIL;
+}
+
+/*
+ * 尾部轮换，将尾部结点移除，并插入到头部(rotate)
+ * Rotate the list removing the tail node and inserting it to the head.
+ */
+void listRotate(list *list)
+{
+    listNode *tail = list->tail;
+
+    // 移除tail
+    list->tail = tail->prev;
+    list->tail->next = NULL;
+
+    // 插入到head之前
+    list->head->prev = tail;
+    tail->prev = NULL;
+    tail->next = list->head;
+    list->head = tail;
+}
 
 // gcc -D ADLIST_TEST_MAIN  -Wall  -ggdb hello_adlist.c -o adlist &&
 // valgrind --vgdb=yes --leak-check=full --track-origins=yes ./adlist
@@ -418,6 +449,12 @@ void* sdsdup_wapper(void *ptr)
     return sdsdup((const sds)ptr);
 }
 
+// match 函数，其实也可以用函数指针类型强转
+// list->math = (int (*)(void *, void *))sdscmp
+int sdscmp_wapper(void *ptr, void *key)
+{
+    return sdscmp((const sds)ptr,(const sds)key);
+}
 
 int main()
 {
@@ -538,7 +575,7 @@ int main()
         //     );
         
         listNode* key = pList->head->next;
-
+        pList->match = (int (*)(void *, void *))sdscmp;// 函数转型为match类型
         listNode* node = listSearchKey(pList, key->value);
         // if(node)
         //     printf("%s,%s\n",(char*) key->value, (char*)node->value);
@@ -568,6 +605,36 @@ int main()
             && memcmp(node->value, "Nil.Yang\0", 9) == 0
             )
     }
+
+    //10. listRewind/listRewindTail test
+    {
+        listIter *iter = listGetIterator(pList2, AL_START_TAIL);
+        listRewind(pList2, iter);
+
+        test_cond_ext("listRewind(pList, iter) test",
+            iter->direction== AL_START_HEAD
+            && pList2->head == iter->next
+        )
+
+        listRewindTail(pList2, iter);
+        test_cond_ext("listRewindTail(pList, iter) test",
+            iter->direction == AL_START_TAIL
+            && pList2->tail == iter->next
+        )
+        
+        listReleaseIterator(iter);
+    }
+    //11. listRotate() test
+    {
+        listNode *tail = pList2->tail;
+        listNode *head = pList2->head;
+        listRotate(pList2);
+        test_cond_ext("listRotate(pList) test",
+            pList2->head == tail
+            && pList2->head->next == head
+        )
+    }
+
     listRelease(pList);
     listRelease(pList2);
     return 0;
