@@ -357,8 +357,44 @@ listNode *listSearchKey(list *list, void *key)
 
     return node;
 }
-// listNode *listIndex(list *list, long index);
-// void listRewind(list *list, listIter *li);
+
+/*
+ * 按索引取结点（返回结点指针）
+ * （从head到tail ，索引 0 ~ (list->len-1) 以此类推）
+ * 对于负数索引，则反向计算从tail开始，-1 表示最后一个元素，-2 倒数第二个，依此类推。
+ * 如果索引超出了范围（即链表长度），则返回NULL
+ * 
+ * Return the element at the specified zero-based index
+ * where 0 is the head, 1 is the element next to head
+ * and so on. Negative integers are used in order to count
+ * from the tail, -1 is the last element, -2 the penultimate
+ * and so on. If the index is out of range NULL is returned. 
+ *
+ */
+listNode *listIndex(list *list, long index)
+{
+    listIter *iter;
+    listNode *node;
+    unsigned long  count=0, idx;
+    idx = index>0?index:-index;
+    if (idx > list->len-1) return NULL;
+
+    iter = listGetIterator(list, index<0 ? AL_START_TAIL: AL_START_HEAD);
+    if (iter == NULL) return NULL;
+
+    // 无需 count++ < idx+1，count==idx 时还会执行一次赋值操作 :-)
+    while((node=listNext(iter))!=NULL && count++ < idx);
+
+    // 记得释放迭代器申请的内存
+    listReleaseIterator(iter);
+
+    return node;
+}
+
+void listRewind(list *list, listIter *li)
+{
+
+}
 // void listRewindTail(list *list, listIter *li);
 // void listRotate(list *list);
 
@@ -483,19 +519,54 @@ int main()
         && memcmp(pList2->tail->value, "world\0", 6) == 0
         )
     // printf("%s\n", (char*)pList2->head->next->value);
+   
+    /*
+        +------+----------+-------+
+        |Hello | goodbyte | world |
+        +------+----------+-------+
+        ^                 ^        
+        |                 |
+        head             tail
+    */
+
     // 8. listSearchKey(list, key) test
     {
-        printf("%s,%s,%s\n",
-             (char*) pList->head->value
-            ,(char*) pList->head->next->value
-            ,(char*) pList->head->next->next->value
-            );
+        // printf("%s,%s,%s\n",
+        //      (char*) pList->head->value
+        //     ,(char*) pList->head->next->value
+        //     ,(char*) pList->head->next->next->value
+        //     );
         
         listNode* key = pList->head->next;
 
         listNode* node = listSearchKey(pList, key->value);
-        if(node)
-            printf("%s,%s\n",(char*) key->value, (char*)node->value);
+        // if(node)
+        //     printf("%s,%s\n",(char*) key->value, (char*)node->value);
+        
+        test_cond_ext("listSearchKey(pList, pValue) test",
+            pList->head->next == node
+            && memcmp(node->value, "goodbyte\0", 9) ==0
+        )
+    }
+
+    //9. listIndex(list, index) test
+    {
+    /*
+        +------+----------+-------+----------+
+        |Hello | goodbyte | world | Nil.Yang |
+        +--[0]-+-[1]------+-[2]---+-[3]------+
+        ^                         ^        
+        |                         |
+        head                     tail
+    */
+        pList2 = listAddNodeTail(pList2, sdsnew("Nil.Yang"));
+        listNode *node = listIndex(pList2, 3);
+        // if (node) 
+        //     printf("listIndex=%s\n", (char *)node->value);
+        test_cond_ext("listIndex(pList, index) test",
+            pList2->len == 4
+            && memcmp(node->value, "Nil.Yang\0", 9) == 0
+            )
     }
     listRelease(pList);
     listRelease(pList2);
